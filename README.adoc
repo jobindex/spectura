@@ -1,0 +1,16 @@
+= Spectura
+
+== Setup
+
+After cloning:
+
+[source,shell]
+$ git config --local user.name "<workplace username>"
+$ git config --local user.email "<workplace email>"
+$ export GOPRIVATE=github.com/jobindex/decap
+$ go build
+
+== Usage
+
+[source,shell]
+$ ./spectura
