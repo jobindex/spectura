@@ -4,6 +4,9 @@
 
 After cloning:
 
+Read https://go.dev/ref/mod#private-module-repo-auth and decide how you want to
+build code with private repository dependencies (Decap).
+
 [source,shell]
 $ git config --local user.name "<workplace username>"
 $ git config --local user.email "<workplace email>"
