@@ -128,6 +128,7 @@ func jobadHandler(w http.ResponseWriter, req *http.Request) {
 		var m image.Image
 		if err = imageFromDecap(id, &m); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		sm := m.(SubImager)
 		m = sm.SubImage(image.Rect(0, 0, 600, 314))
