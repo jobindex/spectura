@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jobindex/decap"
+	"spectura/decap"
 )
 
 const (
@@ -150,24 +150,24 @@ func jobadHandler(w http.ResponseWriter, req *http.Request) {
 func imageFromDecap(id int, m *image.Image) error {
 
 	url := fmt.Sprintf("https://www.jobindex.dk/jobannonce/%d/?pictura=1", id)
-	q := decap.Request{
+	req := decap.Request{
 		EmulateViewport: []string{"600", "800", "mobile"},
 		RenderDelay:     "100ms",
 		Timeout:         "10s",
 		Query: []*decap.QueryBlock{
 			{
 				Actions: []decap.Action{
-					decap.NewAction("navigate", url),
-					decap.NewAction("listen"),
-					decap.NewAction("sleep"),
-					decap.NewAction("screenshot", "element", "article"),
+					decapAction("navigate", url),
+					decapAction("listen"),
+					decapAction("sleep"),
+					decapAction("screenshot", "element", "article"),
 				},
 			},
 		},
 	}
 
 	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(q)
+	err := json.NewEncoder(&buf).Encode(req)
 	if err != nil {
 		return fmt.Errorf("couldn't encode JSON response body: %s", err)
 	}
@@ -193,6 +193,10 @@ func imageFromDecap(id int, m *image.Image) error {
 
 type SubImager interface {
 	SubImage(r image.Rectangle) image.Image
+}
+
+func decapAction(list ...string) decap.Action {
+	return decap.Action(list)
 }
 
 func fmtByteSize(n int) string {
