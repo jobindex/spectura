@@ -40,22 +40,32 @@ func main() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 }
 
+// A CacheEntry is a chunk of bytes that may be stored in a Cache. It maintains
+// its own storage ID for use with a Cache.
 type CacheEntry struct {
 	bytes []byte
 	id    int
 	last  time.Time
 }
 
+// IsEmpty reports whether e is a zero value CacheEntry.
 func (e *CacheEntry) IsEmpty() bool {
 	return e.bytes == nil && e.id == 0
 }
 
+// A Cache is an in-memory key-value store of recently accessed CacheEntry
+// values. A new (zero value) Cache must be initialized before use (see Init).
+// Caches are safe for concurrent use by multiple goroutines.
+//
+// An entry that hasn't been requested for 12 hours is deleted from the Cache.
 type Cache struct {
 	entries               map[int]CacheEntry
 	readQuery             chan int
 	readReply, writeQuery chan CacheEntry
 }
 
+// Init initializes an existing Cache value for use through the Read and Write
+// methods.
 func (c *Cache) Init() {
 	*c = Cache{
 		entries:    make(map[int]CacheEntry),
@@ -66,11 +76,14 @@ func (c *Cache) Init() {
 	go c.serve()
 }
 
+// Read returns the cache value with key id. If no entry was found, a zero value
+// CacheEntry is returned.
 func (c *Cache) Read(id int) CacheEntry {
 	c.readQuery <- id
 	return <-c.readReply
 }
 
+// Write writes a CacheEntry to the cache, using entry.id as the key.
 func (c *Cache) Write(entry CacheEntry) {
 	c.writeQuery <- entry
 }
