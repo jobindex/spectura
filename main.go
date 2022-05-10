@@ -43,14 +43,14 @@ func main() {
 // A CacheEntry is a chunk of bytes that may be stored in a Cache. It maintains
 // its own storage ID for use with a Cache.
 type CacheEntry struct {
-	bytes []byte
-	id    int
+	Bytes []byte
+	ID    int
 	last  time.Time
 }
 
 // IsEmpty reports whether e is a zero value CacheEntry.
 func (e *CacheEntry) IsEmpty() bool {
-	return e.bytes == nil && e.id == 0
+	return e.Bytes == nil && e.ID == 0
 }
 
 // A Cache is an in-memory key-value store of recently accessed CacheEntry
@@ -83,7 +83,7 @@ func (c *Cache) Read(id int) CacheEntry {
 	return <-c.readReply
 }
 
-// Write writes a CacheEntry to the cache, using entry.id as the key.
+// Write writes a CacheEntry to the cache, using entry.ID as the key.
 func (c *Cache) Write(entry CacheEntry) {
 	c.writeQuery <- entry
 }
@@ -103,7 +103,7 @@ func (c *Cache) serve() {
 
 		case entry := <-c.writeQuery:
 			entry.last = time.Now()
-			c.entries[entry.id] = entry
+			c.entries[entry.ID] = entry
 
 		case <-purge.C:
 			size := 0
@@ -113,7 +113,7 @@ func (c *Cache) serve() {
 					delete(c.entries, id)
 					fmt.Fprintf(os.Stderr, "Clearing cache entry %d\n", id)
 				} else {
-					size += len(entry.bytes)
+					size += len(entry.Bytes)
 				}
 			}
 			fmt.Fprintf(os.Stderr, "%s %d images in cache (%s)\n",
@@ -151,15 +151,15 @@ func jobadHandler(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, msg, http.StatusInternalServerError)
 			return
 		}
-		entry = CacheEntry{id: id, bytes: buf.Bytes()}
-		if len(entry.bytes) > maxEntrySize {
+		entry = CacheEntry{ID: id, Bytes: buf.Bytes()}
+		if len(entry.Bytes) > maxEntrySize {
 			fmt.Fprintf(os.Stderr, "Warning: Caching object (%s) larger than %s\n",
-				fmtByteSize(len(entry.bytes)), fmtByteSize(maxEntrySize))
+				fmtByteSize(len(entry.Bytes)), fmtByteSize(maxEntrySize))
 		}
 		cache.Write(entry)
 	}
 	w.Header().Set("Content-Type", "image/png")
-	w.Write(entry.bytes)
+	w.Write(entry.Bytes)
 }
 
 func imageFromDecap(id int, m *image.Image) error {
