@@ -136,6 +136,7 @@ func jobadHandler(w http.ResponseWriter, req *http.Request) {
 		if err = png.Encode(&buf, m); err != nil {
 			msg := fmt.Sprintf("failed to encode the generated PNG: %s", err)
 			http.Error(w, msg, http.StatusInternalServerError)
+			return
 		}
 		entry = CacheEntry{id: id, bytes: buf.Bytes()}
 		if len(entry.bytes) > maxEntrySize {
