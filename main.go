@@ -32,7 +32,6 @@ func main() {
 	http.HandleFunc("/", http.NotFound)
 	http.Handle(jobadPath, http.HandlerFunc(jobadHandler))
 	cache.Init()
-	go cache.Serve()
 
 	fmt.Fprintf(os.Stderr,
 		"%s spectura is listening on http://localhost:%d%s\n",
@@ -64,6 +63,7 @@ func (c *Cache) Init() {
 		readReply:  make(chan CacheEntry),
 		writeQuery: make(chan CacheEntry),
 	}
+	go c.serve()
 }
 
 func (c *Cache) Read(id int) CacheEntry {
@@ -75,7 +75,7 @@ func (c *Cache) Write(entry CacheEntry) {
 	c.writeQuery <- entry
 }
 
-func (c *Cache) Serve() {
+func (c *Cache) serve() {
 	purge := time.NewTicker(5 * time.Minute)
 	for {
 		select {
