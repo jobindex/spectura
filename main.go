@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"image"
@@ -10,47 +13,103 @@ import (
 	"log"
 	"math/bits"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"spectura/decap"
 )
 
 const (
-	ttl          = time.Hour * 12
-	jobadPath    = "/api/jobad/v0.1/"
-	maxEntrySize = 2 << 22
-	port         = 19165
-	version      = "v0.1"
+	port           = 19165
+	screenshotPath = "/v0/screenshot/"
+)
+
+var (
+	cacheTtl          time.Duration
+	maxImageSize      int
+	decapURL          string
+	signingSecret     string
+	signingKey        string
+	signingUniqueName string
+	useSignatures     bool
 )
 
 var cache Cache
 
 func main() {
+	cacheTtlString, _ := getenv("CACHE_TTL", "12h")
+	var err error
+	cacheTtl, err = time.ParseDuration(cacheTtlString)
+	if err != nil {
+		log.Fatalf(`CACHE_TTL must be a valid duration such as "12h": %s\n`, err)
+	}
+
+	maxImageSizeString, _ := getenv("MAX_IMAGE_SIZE_MIB", "20")
+	maxImageSizeMiB, err := strconv.Atoi(maxImageSizeString)
+	if err != nil {
+		log.Fatalf("MAX_IMAGE_SIZE_MIB must be a number: %s \n", err)
+	}
+	const bytesInMiB = 1 << 20
+	maxImageSize = bytesInMiB * maxImageSizeMiB
+
+	decapURL, err = getenv("DECAP_URL", "http://localhost:4531")
+	if err != nil {
+		log.Fatal(err)
+	}
+	useSignaturesString, _ := getenv("USE_SIGNATURES", "true")
+	if useSignaturesString == "true" {
+		useSignatures = true
+		signingSecret, err = getenv("SIGNING_SECRET")
+		if err != nil {
+			log.Fatalf("%s (alternatively set USE_SIGNATURES=false)", err)
+		}
+		signingKey, err = getenv("SIGNING_KEY")
+		if err != nil {
+			log.Fatalf("%s (alternatively set USE_SIGNATURES=false)", err)
+		}
+		signingUniqueName, _ = getenv("SIGNING_UNIQUE_NAME", "jix_spectura")
+	} else {
+		useSignatures = false
+	}
+
 	http.HandleFunc("/", http.NotFound)
-	http.Handle(jobadPath, http.HandlerFunc(jobadHandler))
+	http.Handle(screenshotPath, http.HandlerFunc(screenshotHandler))
 	cache.Init()
 
 	fmt.Fprintf(os.Stderr,
 		"%s spectura is listening on http://localhost:%d%s\n",
-		time.Now().Format("[15:04:05]"), port, jobadPath,
+		time.Now().Format("[15:04:05]"), port, screenshotPath,
 	)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 }
 
-// A CacheEntry is a chunk of bytes that may be stored in a Cache. It maintains
-// its own storage ID for use with a Cache.
+func getenv(key string, fallback ...string) (string, error) {
+	value := os.Getenv(key)
+	if value != "" {
+		return value, nil
+	}
+	if len(fallback) > 1 {
+		return "", fmt.Errorf("getenv only takes 1 or 2 parameters")
+	}
+	if len(fallback) == 1 {
+		return fallback[0], nil
+	}
+	return "", fmt.Errorf("missing environment variable %s", key)
+}
+
+// A CacheEntry wraps a PNG-encoded image to stored in a Cache. The screenshot
+// URL is used as the cache key.
 type CacheEntry struct {
-	Bytes []byte
-	ID    int
+	Image []byte
+	URL   string
 	last  time.Time
 }
 
 // IsEmpty reports whether e is a zero value CacheEntry.
 func (e *CacheEntry) IsEmpty() bool {
-	return e.Bytes == nil && e.ID == 0
+	return e.Image == nil && e.URL == ""
 }
 
 // A Cache is an in-memory key-value store of recently accessed CacheEntry
@@ -59,8 +118,8 @@ func (e *CacheEntry) IsEmpty() bool {
 //
 // An entry that hasn't been requested for 12 hours is deleted from the Cache.
 type Cache struct {
-	entries               map[int]CacheEntry
-	readQuery             chan int
+	entries               map[string]CacheEntry
+	readQuery             chan string
 	readReply, writeQuery chan CacheEntry
 }
 
@@ -68,22 +127,22 @@ type Cache struct {
 // methods.
 func (c *Cache) Init() {
 	*c = Cache{
-		entries:    make(map[int]CacheEntry),
-		readQuery:  make(chan int),
+		entries:    make(map[string]CacheEntry),
+		readQuery:  make(chan string),
 		readReply:  make(chan CacheEntry),
 		writeQuery: make(chan CacheEntry),
 	}
 	go c.serve()
 }
 
-// Read returns the cache value with key id. If no entry was found, a zero value
-// CacheEntry is returned.
-func (c *Cache) Read(id int) CacheEntry {
-	c.readQuery <- id
+// Read returns the CacheEntry value at the given URL in the cache. If no entry
+// was found, a zero value entry is returned.
+func (c *Cache) Read(url string) CacheEntry {
+	c.readQuery <- url
 	return <-c.readReply
 }
 
-// Write writes a CacheEntry to the cache, using entry.ID as the key.
+// Write writes a CacheEntry to the cache, using entry.URL as the key.
 func (c *Cache) Write(entry CacheEntry) {
 	c.writeQuery <- entry
 }
@@ -93,27 +152,27 @@ func (c *Cache) serve() {
 	for {
 		select {
 
-		case id := <-c.readQuery:
-			entry, exists := c.entries[id]
+		case url := <-c.readQuery:
+			entry, exists := c.entries[url]
 			c.readReply <- entry
 			if exists {
 				entry.last = time.Now()
-				c.entries[id] = entry
+				c.entries[url] = entry
 			}
 
 		case entry := <-c.writeQuery:
 			entry.last = time.Now()
-			c.entries[entry.ID] = entry
+			c.entries[entry.URL] = entry
 
 		case <-purge.C:
 			size := 0
-			for id, entry := range c.entries {
+			for url, entry := range c.entries {
 				elapsed := time.Since(entry.last)
-				if elapsed > ttl {
-					delete(c.entries, id)
-					fmt.Fprintf(os.Stderr, "Clearing cache entry %d\n", id)
+				if elapsed > cacheTtl {
+					delete(c.entries, url)
+					fmt.Fprintf(os.Stderr, "Clearing cache entry %s\n", url)
 				} else {
-					size += len(entry.Bytes)
+					size += len(entry.Image)
 				}
 			}
 			fmt.Fprintf(os.Stderr, "%s %d images in cache (%s)\n",
@@ -122,24 +181,42 @@ func (c *Cache) serve() {
 	}
 }
 
-func jobadHandler(w http.ResponseWriter, req *http.Request) {
-	segments := strings.Split(strings.Trim(req.URL.Path, "/"), "/")
-	if len(segments) != 4 {
-		msg := fmt.Sprintf("path must contain a single job ad ID: %s<id>/", jobadPath)
-		http.Error(w, msg, http.StatusBadRequest)
+// Check a JIX::UrlSignature hash signature
+func checkSignature(url string, signature string) bool {
+	h := hmac.New(sha1.New, []byte(signingKey))
+	h.Write([]byte(signingUniqueName + ":" + url + signingSecret))
+	signatureShouldBe := hex.EncodeToString(h.Sum(nil))
+	return signature == signatureShouldBe
+}
+
+func screenshotHandler(w http.ResponseWriter, req *http.Request) {
+	query := req.URL.Query()
+	targetURL := query.Get("url")
+	if targetURL == "" {
+		http.Error(w, `Query param "url" must be present`, http.StatusBadRequest)
 		return
 	}
-	id, err := strconv.Atoi(segments[3])
-	if err != nil {
-		msg := fmt.Sprintf(`non-numerical job ad ID: "%s"`, segments[3])
-		http.Error(w, msg, http.StatusBadRequest)
+	signature := query.Get("s")
+	if useSignatures && signature == "" {
+		http.Error(w, `Query param "s" must be present`, http.StatusBadRequest)
 		return
 	}
 
-	entry := cache.Read(id)
+	_, err := url.Parse(targetURL)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if useSignatures && !checkSignature(targetURL, signature) {
+		http.Error(w, "Signature check failed", http.StatusBadRequest)
+		return
+	}
+
+	entry := cache.Read(targetURL)
 	if entry.IsEmpty() {
 		var m image.Image
-		if err = imageFromDecap(id, &m); err != nil {
+		if err = imageFromDecap(targetURL, &m); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -151,20 +228,19 @@ func jobadHandler(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, msg, http.StatusInternalServerError)
 			return
 		}
-		entry = CacheEntry{ID: id, Bytes: buf.Bytes()}
-		if len(entry.Bytes) > maxEntrySize {
+		entry = CacheEntry{URL: targetURL, Image: buf.Bytes()}
+		if len(entry.Image) > maxImageSize {
 			fmt.Fprintf(os.Stderr, "Warning: Caching object (%s) larger than %s\n",
-				fmtByteSize(len(entry.Bytes)), fmtByteSize(maxEntrySize))
+				fmtByteSize(len(entry.Image)), fmtByteSize(maxImageSize))
 		}
 		cache.Write(entry)
 	}
 	w.Header().Set("Content-Type", "image/png")
-	w.Write(entry.Bytes)
+	w.Write(entry.Image)
 }
 
-func imageFromDecap(id int, m *image.Image) error {
+func imageFromDecap(url string, m *image.Image) error {
 
-	url := fmt.Sprintf("https://www.jobindex.dk/jobannonce/%d/?pictura=1", id)
 	req := decap.Request{
 		EmulateViewport: []string{"600", "800", "mobile"},
 		RenderDelay:     "100ms",
@@ -175,11 +251,13 @@ func imageFromDecap(id int, m *image.Image) error {
 					decapAction("navigate", url),
 					decapAction("listen"),
 					decapAction("sleep"),
-					decapAction("screenshot", "element", "article"),
+					decapAction("screenshot"),
 				},
 			},
 		},
 	}
+
+	fmt.Println(url)
 
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(req)
@@ -188,7 +266,7 @@ func imageFromDecap(id int, m *image.Image) error {
 	}
 
 	var res *http.Response
-	res, err = http.Post("http://localhost:4531/api/browse/v0.8/", "application/json", &buf)
+	res, err = http.Post(fmt.Sprintf("%s/api/browse/v0.8/", decapURL), "application/json", &buf)
 	if err != nil {
 		return fmt.Errorf("couldn't connect to Decap: %s", err)
 	}

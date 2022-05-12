@@ -1,23 +1,69 @@
 = Spectura
 
+Spectura is a microservice for taking screenshots of websites in an Open Graph
+compatible format usable for link previews on sites such as Facebook and
+LinkedIn.
+
+Spectura takes a `url` and an optional signature `s` as query parameters. The
+signature ensures that we only visit pre-approved URLs.
+
 == Setup
 
-After cloning:
+You either need to run a Decap instance manually, or run everything inside
+Docker as described xref:run_docker[below].
+
+To run Spectura in Docker, you need Docker version 20.10 or higher.
+
+== Running
+
+=== Basic usage
+
+Assuming that Decap is listening on `localhost:4531`:
 
 [source,shell]
-$ git config --local user.name "<workplace username>"
-$ git config --local user.email "<workplace email>"
+----
+go build
+USE_SIGNATURES=false ./spectura
+----
 
-=== When using older versions with Decap dependency
-
-Read https://go.dev/ref/mod#private-module-repo-auth and decide how you want to
-build code with private repository dependencies (Decap). Then:
-
-[source,shell]
-$ export GOPRIVATE=github.com/jobindex/decap
-$ go build
-
-== Usage
+Then make a GET request on the same host:
 
 [source,shell]
-$ ./spectura
+----
+curl "http://localhost:19165/v0/screenshot/?url=https://www.jobindex.dk/?pictura=1" --output screenshot.png
+----
+
+=== Inside Docker [[run_docker]]
+
+To run Spectura
+
+[NOTE]
+Always run with `--build`
+
+[source,shell]
+----
+docker compose up --build
+----
+
+To test Spectura with `curl`
+
+[source,shell]
+----
+curl 'http://localhost:8080/v0/screenshot?s=555426697a26bb43af02808665f0b9ae3726f5eb&url=https://pyjam.as'
+----
+
+If you use kitty terminal you can print the image directly in your terminal
+[source,shell]
+----
+curl 'http://localhost:8080/v0/screenshot?s=555426697a26bb43af02808665f0b9ae3726f5eb&url=https://pyjam.as' | kitty +kitten icat
+----
+
+== Configuration
+
+* `DECAP_URL`, optional, default: `http://localhost:4531`
+* `USE_SIGNATURES`, optional, default: `true`
+* `SIGNING_SECRET`, required if `USE_SIGNATURES`
+* `SIGNING_KEY`, required if `USE_SIGNATURES`
+* `SIGNING_UNIQUE_NAME`, optional, default: `jix_spectura`
+* `CACHE_TTL`, optional, default: `12h`
+* `MAX_IMAGE_SIZE_MIB`, optional, default: `20`

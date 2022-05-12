@@ -1,0 +1,19 @@
+version: '3.7'
+services:
+  spectura:
+    environment:
+      "DECAP_URL": "http://decap:4531"
+      "SIGNING_SECRET": "secret"
+      "SIGNING_KEY": "key"
+      "SIGNING_UNIQUE_NAME": "jix_spectura"
+    depends_on:
+      - decap
+    build:
+      context: .
+    ports:
+      - 8080:19165
+
+  decap:
+    image: <docker registry>/decap:latest
+    expose:
+      - 4531 # expose to spectura but not to host system
