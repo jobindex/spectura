@@ -22,7 +22,7 @@ import (
 
 const (
 	port           = 19165
-	screenshotPath = "/v0/screenshot/"
+	screenshotPath = "/v0/screenshot"
 )
 
 var (
