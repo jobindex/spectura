@@ -17,7 +17,7 @@ import (
 	"strconv"
 	"time"
 
-	"spectura/decap"
+	"github.com/jobindex/spectura/decap"
 )
 
 const (
