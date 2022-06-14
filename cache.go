@@ -29,6 +29,8 @@ type Cache struct {
 	entries               map[string]CacheEntry
 	readQuery             chan string
 	readReply, writeQuery chan CacheEntry
+	readAllQuery          chan struct{}
+	readAllReply          chan []CacheEntry
 	ttl                   time.Duration
 }
 
@@ -36,13 +38,20 @@ type Cache struct {
 // methods.
 func (c *Cache) Init(ttl time.Duration) {
 	*c = Cache{
-		entries:    make(map[string]CacheEntry),
-		readQuery:  make(chan string),
-		readReply:  make(chan CacheEntry),
-		writeQuery: make(chan CacheEntry),
-		ttl:        ttl,
+		entries:      make(map[string]CacheEntry),
+		readQuery:    make(chan string),
+		readReply:    make(chan CacheEntry),
+		writeQuery:   make(chan CacheEntry),
+		readAllQuery: make(chan struct{}),
+		readAllReply: make(chan []CacheEntry),
+		ttl:          ttl,
 	}
 	go c.serve()
+}
+
+func (c *Cache) ReadAll() []CacheEntry {
+	c.readAllQuery <- struct{}{}
+	return <-c.readAllReply
 }
 
 // Read returns the CacheEntry value at the given URL in the cache. If no entry
@@ -61,6 +70,13 @@ func (c *Cache) serve() {
 	purge := time.NewTicker(5 * time.Minute)
 	for {
 		select {
+
+		case <-c.readAllQuery:
+			res := make([]CacheEntry, 0, len(c.entries))
+			for _, entry := range c.entries {
+				res = append(res, entry)
+			}
+			c.readAllReply <- res
 
 		case url := <-c.readQuery:
 			entry, exists := c.entries[url]

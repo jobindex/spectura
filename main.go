@@ -23,6 +23,7 @@ import (
 const (
 	port           = 19165
 	screenshotPath = "/api/spectura/v0/screenshot"
+	infoPath       = "/api/spectura/v0/info"
 )
 
 var (
@@ -73,6 +74,7 @@ func main() {
 
 	http.HandleFunc("/", http.NotFound)
 	http.Handle(screenshotPath, http.HandlerFunc(screenshotHandler))
+	http.Handle(infoPath, http.HandlerFunc(infoHandler))
 	cache.Init(cacheTTL)
 
 	fmt.Fprintf(os.Stderr,
@@ -166,6 +168,7 @@ func imageFromDecap(url string, m *image.Image) error {
 					decapAction("navigate", url),
 					decapAction("listen"),
 					decapAction("sleep"),
+					decapAction("remove_cookie_info"),
 					decapAction("screenshot"),
 				},
 			},
