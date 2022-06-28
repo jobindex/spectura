@@ -184,7 +184,7 @@ func imageFromDecap(url string, m *image.Image) error {
 	}
 
 	var res *http.Response
-	res, err = http.Post(fmt.Sprintf("%s/api/browse/v0.8/", decapURL), "application/json", &buf)
+	res, err = http.Post(fmt.Sprintf("%s/api/decap/v0/browse", decapURL), "application/json", &buf)
 	if err != nil {
 		return fmt.Errorf("couldn't connect to Decap: %s", err)
 	}
