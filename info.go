@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"text/template"
 )
 
 const headerFmt = `<!doctype html>
@@ -50,9 +51,9 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	for _, entry := range entries {
 		fmt.Fprintf(w, rowFmt,
 			screenshotPath,
-			entry.URL,
+			template.HTMLEscapeString(entry.URL),
 			fmtByteSize(len(entry.Image)),
-			shortenURL(entry.URL, 80),
+			template.HTMLEscapeString(shortenURL(entry.URL, 80)),
 		)
 	}
 	io.WriteString(w, footer)
