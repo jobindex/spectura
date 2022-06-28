@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - '*.*'
+      - 'dev'
 
 jobs:
   build:
@@ -22,6 +23,8 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
+          # don't push `dev` to :latest
+          flavor: "latest=${{ github.ref != 'refs/tags/dev' }}"
           images: jobindex/${{ github.event.repository.name }}
 
       - name: Build and push
