@@ -191,9 +191,7 @@ func imageFromDecap(url string, m *image.Image) error {
 	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/png" {
 		msg, _ := io.ReadAll(res.Body)
 		return fmt.Errorf(
-			"unsuccesful Decap request: %d %s; %s",
-			res.StatusCode, res.Status, msg,
-		)
+			"unsuccesful Decap request: %s; %s", res.Status, msg)
 	}
 
 	if *m, err = png.Decode(res.Body); err != nil {
