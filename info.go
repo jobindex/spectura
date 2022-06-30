@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"text/template"
 )
 
@@ -38,7 +39,7 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 <td style="padding: 10px;"><img class="img-thumbnail" src="%s?url=%s"></td>
 <td><dl>
 <dt>Size</dt><dd>%s</dd>
-<dt>URL</dt><dd><a href="%[2]s">%[4]s</a></dd>
+<dt>URL</dt><dd><a href="%s">%s</a></dd>
 </dl></td>
 </tr>
 `
@@ -51,8 +52,9 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	for _, entry := range entries {
 		fmt.Fprintf(w, rowFmt,
 			screenshotPath,
-			template.HTMLEscapeString(entry.URL),
+			template.HTMLEscapeString(url.QueryEscape(entry.URL)),
 			fmtByteSize(len(entry.Image)),
+			template.HTMLEscapeString(entry.URL),
 			template.HTMLEscapeString(shortenURL(entry.URL, 80)),
 		)
 	}
