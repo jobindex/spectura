@@ -15,22 +15,24 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jobindex/spectura/decap"
 )
 
 const (
-	port           = 19165
-	screenshotPath = "/api/spectura/v0/screenshot"
-	infoPath       = "/api/spectura/v0/info"
+	port             = 19165
+	screenshotPath   = "/api/spectura/v0/screenshot"
+	infoPath         = "/api/spectura/v0/info"
+	fallbackImageURL = "https://www.jobindex.dk/img/jobindex20/spectura_adshare.png"
 )
 
 var (
-	maxImageSize      int
 	decapURL          string
-	signingSecret     string
+	maxImageSize      int
 	signingKey        string
+	signingSecret     string
 	signingUniqueName string
 	useSignatures     bool
 )
@@ -72,10 +74,11 @@ func main() {
 		useSignatures = false
 	}
 
+	cache.Init(cacheTTL, fallbackImageURL)
+
 	http.HandleFunc("/", http.NotFound)
 	http.Handle(screenshotPath, http.HandlerFunc(screenshotHandler))
 	http.Handle(infoPath, http.HandlerFunc(infoHandler))
-	cache.Init(cacheTTL)
 
 	fmt.Fprintf(os.Stderr,
 		"%s spectura is listening on http://localhost:%d%s\n",
@@ -132,25 +135,35 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 
 	entry := cache.Read(targetURL)
 	if entry.IsEmpty() {
+		entry.URL = targetURL
+
 		var m image.Image
-		if err = imageFromDecap(targetURL, &m); err != nil {
+		err = imageFromDecap(targetURL, &m)
+		switch {
+		case err == nil:
+			sm := m.(SubImager)
+			m = sm.SubImage(image.Rect(0, 0, 600, 314))
+			var buf bytes.Buffer
+			if err = png.Encode(&buf, m); err != nil {
+				msg := fmt.Sprintf("failed to encode the generated PNG: %s", err)
+				http.Error(w, msg, http.StatusInternalServerError)
+				return
+			}
+			entry.Image = buf.Bytes()
+			if len(entry.Image) > maxImageSize {
+				fmt.Fprintf(os.Stderr, "Warning: Caching object (%s) larger than %s\n",
+					fmtByteSize(len(entry.Image)), fmtByteSize(maxImageSize))
+			}
+			cache.Write(entry)
+
+		case strings.Contains(err.Error(), "500 Internal Server Error"):
+			cache.Write(entry)
+			entry = cache.Read(entry.URL)
+
+		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		sm := m.(SubImager)
-		m = sm.SubImage(image.Rect(0, 0, 600, 314))
-		var buf bytes.Buffer
-		if err = png.Encode(&buf, m); err != nil {
-			msg := fmt.Sprintf("failed to encode the generated PNG: %s", err)
-			http.Error(w, msg, http.StatusInternalServerError)
-			return
-		}
-		entry = CacheEntry{URL: targetURL, Image: buf.Bytes()}
-		if len(entry.Image) > maxImageSize {
-			fmt.Fprintf(os.Stderr, "Warning: Caching object (%s) larger than %s\n",
-				fmtByteSize(len(entry.Image)), fmtByteSize(maxImageSize))
-		}
-		cache.Write(entry)
 	}
 	w.Header().Set("Content-Type", "image/png")
 	w.Write(entry.Image)
