@@ -1,14 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"image"
-	"image/png"
-	"log"
 	"math/bits"
-	"net/http"
-	"net/url"
 	"os"
 	"time"
 )
@@ -43,7 +37,7 @@ type Cache struct {
 
 // Init initializes an existing Cache value for use through the Read and Write
 // methods.
-func (c *Cache) Init(ttl time.Duration, imageURL string) {
+func (c *Cache) Init(ttl time.Duration) {
 	*c = Cache{
 		entries:       make(map[string]CacheEntry),
 		fallbackImage: encodeEmptyPNG(600, 314),
@@ -54,7 +48,7 @@ func (c *Cache) Init(ttl time.Duration, imageURL string) {
 		readAllReply:  make(chan []CacheEntry),
 		ttl:           ttl,
 	}
-	go c.initFallbackImage(imageURL)
+	go c.initFallbackImage()
 	go c.serve()
 }
 
@@ -118,59 +112,6 @@ func (c *Cache) serve() {
 				time.Now().Format("[15:04:05]"), len(c.entries), fmtByteSize(size))
 		}
 	}
-}
-
-func (c *Cache) initFallbackImage(imageURL string) {
-	_, err := url.ParseRequestURI(imageURL)
-	if err != nil {
-		if imageURL != "" {
-			fmt.Fprintf(os.Stderr, "Bad fallback image URL: %s\n", err)
-		}
-		return
-	}
-	var res *http.Response
-	for {
-		var errMsg string
-		res, err = http.Get(imageURL)
-		switch {
-		case err != nil:
-			errMsg = err.Error()
-		case res.StatusCode != 200:
-			errMsg = res.Status
-		default:
-			var m image.Image
-			if m, err = png.Decode(res.Body); err != nil {
-				errMsg = err.Error()
-				break
-			}
-			sm := m.(SubImager)
-			m = sm.SubImage(image.Rect(0, 0, 600, 314))
-			var buf bytes.Buffer
-			if err = png.Encode(&buf, m); err != nil {
-				errMsg = err.Error()
-				break
-			}
-			fmt.Fprintf(os.Stderr, "Replacing fallback image with %s\n", imageURL)
-
-			// lock cache while fallback image is replaced
-			c.readQuery <- ""
-			c.fallbackImage = buf.Bytes()
-			<-c.readReply
-
-			return
-		}
-		fmt.Fprintf(os.Stderr, "Bad fallback image (%s): %s\n", imageURL, errMsg)
-		time.Sleep(15 * time.Second)
-	}
-}
-
-func encodeEmptyPNG(width, height int) []byte {
-	m := image.NewRGBA(image.Rect(0, 0, width, height))
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, m); err != nil {
-		log.Fatal("Couldn't encode empty PNG")
-	}
-	return buf.Bytes()
 }
 
 func fmtByteSize(n int) string {

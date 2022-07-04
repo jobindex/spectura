@@ -5,11 +5,9 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"image"
 	"image/png"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -17,15 +15,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/jobindex/spectura/decap"
 )
 
 const (
-	port             = 19165
-	screenshotPath   = "/api/spectura/v0/screenshot"
-	infoPath         = "/api/spectura/v0/info"
-	fallbackImageURL = "https://www.jobindex.dk/img/jobindex20/spectura_adshare.png"
+	port           = 19165
+	screenshotPath = "/api/spectura/v0/screenshot"
+	infoPath       = "/api/spectura/v0/info"
 )
 
 var (
@@ -74,7 +69,7 @@ func main() {
 		useSignatures = false
 	}
 
-	cache.Init(cacheTTL, fallbackImageURL)
+	cache.Init(cacheTTL)
 
 	http.HandleFunc("/", http.NotFound)
 	http.Handle(screenshotPath, http.HandlerFunc(screenshotHandler))
@@ -167,56 +162,4 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	w.Header().Set("Content-Type", "image/png")
 	w.Write(entry.Image)
-}
-
-func imageFromDecap(url string, m *image.Image) error {
-
-	req := decap.Request{
-		EmulateViewport: []string{"600", "800", "mobile"},
-		RenderDelay:     "100ms",
-		Timeout:         "10s",
-		Query: []*decap.QueryBlock{
-			{
-				Actions: []decap.Action{
-					decapAction("navigate", url),
-					decapAction("listen"),
-					decapAction("sleep"),
-					decapAction("remove_cookie_info"),
-					decapAction("screenshot"),
-				},
-			},
-		},
-	}
-
-	fmt.Println(url)
-
-	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(req)
-	if err != nil {
-		return fmt.Errorf("couldn't encode JSON response body: %s", err)
-	}
-
-	var res *http.Response
-	res, err = http.Post(fmt.Sprintf("%s/api/decap/v0/browse", decapURL), "application/json", &buf)
-	if err != nil {
-		return fmt.Errorf("couldn't connect to Decap: %s", err)
-	}
-	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/png" {
-		msg, _ := io.ReadAll(res.Body)
-		return fmt.Errorf(
-			"unsuccesful Decap request: %s; %s", res.Status, msg)
-	}
-
-	if *m, err = png.Decode(res.Body); err != nil {
-		return fmt.Errorf("couldn't decode PNG from Decap: %s", err)
-	}
-	return nil
-}
-
-type SubImager interface {
-	SubImage(r image.Rectangle) image.Image
-}
-
-func decapAction(list ...string) decap.Action {
-	return decap.Action(list)
 }
