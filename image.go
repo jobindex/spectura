@@ -36,6 +36,7 @@ func imageFromDecap(url string, m *image.Image) error {
 					decapAction("sleep"),
 					decapAction("remove_info_boxes"),
 					decapAction("hide_navigation"),
+					decapAction("sleep", "400ms"),
 					decapAction("screenshot"),
 				},
 			},
