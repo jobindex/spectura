@@ -26,13 +26,13 @@ func imageFromDecap(url string, m *image.Image) error {
 
 	req := decap.Request{
 		EmulateViewport: []string{"600", "800", "mobile"},
-		RenderDelay:     "100ms",
+		RenderDelay:     "800ms",
 		Timeout:         "10s",
 		Query: []*decap.QueryBlock{
 			{
 				Actions: []decap.Action{
 					decapAction("navigate", url),
-					decapAction("listen"),
+					decapAction("listen", "DOMContentLoaded", "load"),
 					decapAction("sleep"),
 					decapAction("remove_info_boxes"),
 					decapAction("hide_navigation"),
