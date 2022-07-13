@@ -70,6 +70,9 @@ func main() {
 	}
 
 	cache.Init(cacheTTL)
+	if err = loadImageConf(); err != nil {
+		log.Fatalf(`Couldn't load image configuration from "%s": %s`, imageConfPath, err)
+	}
 
 	http.HandleFunc("/", http.NotFound)
 	http.Handle(screenshotPath, http.HandlerFunc(screenshotHandler))
@@ -106,8 +109,8 @@ func checkSignature(url string, signature string) bool {
 
 func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 	query := req.URL.Query()
-	targetURL := query.Get("url")
-	if targetURL == "" {
+	rawURL := query.Get("url")
+	if rawURL == "" {
 		http.Error(w, `Query param "url" must be present`, http.StatusBadRequest)
 		return
 	}
@@ -117,27 +120,29 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	_, err := url.Parse(targetURL)
+	targetURL, err := url.Parse(rawURL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if useSignatures && !checkSignature(targetURL, signature) {
+	if useSignatures && !checkSignature(targetURL.String(), signature) {
 		http.Error(w, "Signature check failed", http.StatusBadRequest)
 		return
 	}
 
-	entry := cache.Read(targetURL)
+	entry := cache.Read(targetURL.String())
 	if entry.IsEmpty() {
-		entry.URL = targetURL
+		entry.URL = targetURL.String()
 
 		var m image.Image
 		err = imageFromDecap(targetURL, &m)
 		switch {
 		case err == nil:
+			voffset := getConfFromHostname(targetURL.Hostname()).Voffset
+			fmt.Fprintf(os.Stderr, "voffset from global conf was %d\n", voffset)
 			sm := m.(SubImager)
-			m = sm.SubImage(image.Rect(0, 0, 600, 314))
+			m = sm.SubImage(image.Rect(0, voffset, 600, voffset+314))
 			var buf bytes.Buffer
 			if err = png.Encode(&buf, m); err != nil {
 				msg := fmt.Sprintf("failed to encode the generated PNG: %s", err)

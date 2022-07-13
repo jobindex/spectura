@@ -7,43 +7,51 @@ import (
 	"image"
 	"image/png"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jobindex/spectura/decap"
 )
 
-const fallbackImageURL = "https://www.jobindex.dk/img/jobindex20/spectura_adshare.png"
+const (
+	fallbackImageURL = "https://www.jobindex.dk/img/jobindex20/spectura_adshare.png"
+	imageConfPath    = "image_conf.json"
+)
 
 type SubImager interface {
 	SubImage(r image.Rectangle) image.Image
 }
 
-func imageFromDecap(url string, m *image.Image) error {
+func imageFromDecap(targetURL *url.URL, m *image.Image) error {
+
+	extraDelay := getConfFromHostname(targetURL.Hostname()).Delay
+	delay := 2000 + extraDelay
+	fmt.Fprintf(os.Stderr, "delay (incl. global conf) was %d\n", delay)
 
 	req := decap.Request{
-		EmulateViewport: []string{"600", "800", "mobile"},
-		RenderDelay:     "800ms",
+		EmulateViewport: []string{"600", "1200", "mobile"},
+		RenderDelay:     fmt.Sprintf("%dms", delay),
 		Timeout:         "10s",
 		Query: []*decap.QueryBlock{
 			{
 				Actions: []decap.Action{
-					decapAction("navigate", url),
-					decapAction("listen", "DOMContentLoaded", "load"),
+					decapAction("navigate", targetURL.String()),
 					decapAction("sleep"),
 					decapAction("remove_info_boxes"),
 					decapAction("hide_navigation"),
-					decapAction("sleep", "400ms"),
+					decapAction("sleep", "1000ms"),
 					decapAction("screenshot"),
 				},
 			},
 		},
 	}
 
-	fmt.Println(url)
+	fmt.Println(targetURL.String())
 
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(req)
@@ -123,4 +131,50 @@ func encodeEmptyPNG(width, height int) []byte {
 		log.Fatal("Couldn't encode empty PNG")
 	}
 	return buf.Bytes()
+}
+
+type imageConfEntry struct {
+	Delay   int `json:"delay"`
+	Voffset int `json:"voffset"`
+}
+
+var globalImageConf map[string]imageConfEntry
+
+func getConfFromHostname(hostname string) (entry imageConfEntry) {
+	for sepCount := strings.Count(hostname, "."); sepCount > 0; sepCount-- {
+		if hostnameEntry, ok := globalImageConf[hostname]; ok {
+			if entry.Delay == 0 {
+				entry.Delay = hostnameEntry.Delay
+			}
+			if entry.Voffset == 0 {
+				entry.Voffset = hostnameEntry.Voffset
+			}
+			if entry.Delay != 0 && entry.Voffset != 0 {
+				return entry
+			}
+		}
+		hostname = strings.SplitN(hostname, ".", 2)[1]
+	}
+	return entry
+}
+
+func loadImageConf() error {
+	globalImageConf = make(map[string]imageConfEntry)
+
+	_, err := url.ParseRequestURI(imageConfPath)
+	if err == nil {
+		var res *http.Response
+		res, err = http.Get(imageConfPath)
+		if err == nil {
+			err = json.NewDecoder(res.Body).Decode(&globalImageConf)
+			res.Body.Close()
+		}
+	} else {
+		var content []byte
+		content, err = ioutil.ReadFile(imageConfPath)
+		if err == nil {
+			err = json.Unmarshal(content, &globalImageConf)
+		}
+	}
+	return err
 }

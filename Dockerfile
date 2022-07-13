@@ -7,7 +7,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # copy sause
-COPY *.go ./
+COPY *.go *.json ./
 COPY decap/ ./decap/
 
 # build
