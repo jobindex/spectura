@@ -133,6 +133,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 
 	entry := cache.Read(targetURL.String())
 	if entry.IsEmpty() {
+		entry.Signature = signature
 		entry.URL = targetURL.String()
 
 		var m image.Image
@@ -149,7 +150,6 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 			entry.Image = buf.Bytes()
-			entry.Signature = signature
 			if len(entry.Image) > maxImageSize {
 				fmt.Fprintf(os.Stderr, "Warning: Caching object (%s) larger than %s\n",
 					fmtByteSize(len(entry.Image)), fmtByteSize(maxImageSize))

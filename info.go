@@ -52,7 +52,7 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	for _, entry := range entries {
 		fmt.Fprintf(w, rowFmt,
 			screenshotPath,
-			template.HTMLEscapeString(entry.queryParams()),
+			entry.queryParams(),
 			fmtByteSize(len(entry.Image)),
 			template.HTMLEscapeString(entry.URL),
 			template.HTMLEscapeString(shortenURL(entry.URL, 80)),
@@ -75,9 +75,12 @@ func (e *CacheEntry) queryParams() string {
 	if useSignatures {
 		return fmt.Sprintf(
 			"s=%s&url=%s",
-			url.QueryEscape(e.Signature),
-			url.QueryEscape(e.URL),
+			template.HTMLEscapeString(url.QueryEscape(e.Signature)),
+			template.HTMLEscapeString(url.QueryEscape(e.URL)),
 		)
 	}
-	return fmt.Sprintf("url=%s", url.QueryEscape(e.URL))
+	return fmt.Sprintf(
+		"url=%s",
+		template.HTMLEscapeString(url.QueryEscape(e.URL)),
+	)
 }

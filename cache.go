@@ -21,6 +21,10 @@ func (e *CacheEntry) IsEmpty() bool {
 	return e.Image == nil && e.Signature == "" && e.URL == ""
 }
 
+func (e *CacheEntry) IsFailedImage() bool {
+	return e.URL != "" && e.Image == nil
+}
+
 // A Cache is an in-memory key-value store of recently accessed CacheEntry
 // values. A new (zero value) Cache must be initialized before use (see Init).
 // Caches are safe for concurrent use by multiple goroutines.
@@ -85,7 +89,7 @@ func (c *Cache) serve() {
 		case url := <-c.readQuery:
 			entry, exists := c.entries[url]
 			replyEntry := entry
-			if entry.URL != "" && entry.Image == nil {
+			if entry.IsFailedImage() {
 				replyEntry.Image = c.fallbackImage
 			}
 			c.readReply <- replyEntry
