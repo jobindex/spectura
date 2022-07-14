@@ -36,7 +36,7 @@ const footer = `</tbody>
 func infoHandler(w http.ResponseWriter, req *http.Request) {
 
 	const rowFmt = `<tr>
-<td style="padding: 10px;"><img class="img-thumbnail" src="%s?url=%s"></td>
+<td style="padding: 10px;"><img class="img-thumbnail" src="%s?%s"></td>
 <td><dl>
 <dt>Size</dt><dd>%s</dd>
 <dt>URL</dt><dd><a href="%s">%s</a></dd>
@@ -52,7 +52,7 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	for _, entry := range entries {
 		fmt.Fprintf(w, rowFmt,
 			screenshotPath,
-			template.HTMLEscapeString(url.QueryEscape(entry.URL)),
+			template.HTMLEscapeString(entry.queryParams()),
 			fmtByteSize(len(entry.Image)),
 			template.HTMLEscapeString(entry.URL),
 			template.HTMLEscapeString(shortenURL(entry.URL, 80)),
@@ -69,4 +69,15 @@ func shortenURL(url string, max int) string {
 		max = 3
 	}
 	return fmt.Sprintf("%.*s...", max-3, url)
+}
+
+func (e *CacheEntry) queryParams() string {
+	if useSignatures {
+		return fmt.Sprintf(
+			"s=%s&url=%s",
+			url.QueryEscape(e.Signature),
+			url.QueryEscape(e.URL),
+		)
+	}
+	return fmt.Sprintf("url=%s", url.QueryEscape(e.URL))
 }

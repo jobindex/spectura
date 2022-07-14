@@ -10,14 +10,15 @@ import (
 // A CacheEntry wraps a PNG-encoded image to stored in a Cache. The screenshot
 // URL is used as the cache key.
 type CacheEntry struct {
-	Image []byte
-	URL   string
-	last  time.Time
+	Image     []byte
+	Signature string
+	URL       string
+	last      time.Time
 }
 
 // IsEmpty reports whether e is a zero value CacheEntry.
 func (e *CacheEntry) IsEmpty() bool {
-	return e.Image == nil && e.URL == ""
+	return e.Image == nil && e.Signature == "" && e.URL == ""
 }
 
 // A Cache is an in-memory key-value store of recently accessed CacheEntry
