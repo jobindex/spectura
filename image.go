@@ -101,6 +101,7 @@ func imageFromDecap(targetURL *url.URL, m *image.Image) error {
 	if err != nil {
 		return fmt.Errorf("couldn't connect to Decap: %s", err)
 	}
+	defer res.Body.Close()
 	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/png" {
 		msg, _ := io.ReadAll(res.Body)
 		return fmt.Errorf(
@@ -134,12 +135,14 @@ func (c *Cache) initFallbackImage() {
 			errMsg = err.Error()
 		case res.StatusCode != 200:
 			errMsg = res.Status
+			res.Body.Close()
 		default:
 			var m image.Image
 			if m, err = png.Decode(res.Body); err != nil {
 				errMsg = err.Error()
 				break
 			}
+			res.Body.Close()
 			sm := m.(SubImager)
 			m = sm.SubImage(image.Rect(0, 0, OGImageWidth, OGImageHeight))
 			var buf bytes.Buffer
