@@ -40,7 +40,7 @@ type Cache struct {
 func (c *Cache) Init(ttl time.Duration) {
 	*c = Cache{
 		entries:       make(map[string]CacheEntry),
-		fallbackImage: encodeEmptyPNG(600, 314),
+		fallbackImage: encodeEmptyPNG(OGImageWidth, OGImageHeight),
 		readQuery:     make(chan string),
 		readReply:     make(chan CacheEntry),
 		writeQuery:    make(chan CacheEntry),

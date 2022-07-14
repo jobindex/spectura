@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,10 +22,46 @@ import (
 const (
 	fallbackImageURL = "https://www.jobindex.dk/img/jobindex20/spectura_adshare.png"
 	imageConfPath    = "image_conf.json"
+	OGImageHeight    = 314
+	OGImageWidth     = 600
 )
 
 type SubImager interface {
 	SubImage(r image.Rectangle) image.Image
+}
+
+func cropImage(m image.Image, voffset int) image.Image {
+	sm := m.(SubImager)
+
+	// If the image contains more than 30 background-looking rows, we remove
+	// some of them by cropping a bit lower.
+	count := countSingleColoredRows(m, voffset)
+	if count > 30 {
+		voffset += count - 30
+	}
+
+	if maxVoffset := m.Bounds().Dy() - OGImageHeight; voffset > maxVoffset {
+		voffset = maxVoffset
+	}
+	return sm.SubImage(image.Rect(0, voffset, OGImageWidth, OGImageHeight+voffset))
+}
+
+func countSingleColoredRows(m image.Image, offset int) int {
+	bounds := m.Bounds()
+	count := 0
+	r0, g0, b0, a0 := m.At(bounds.Min.X, bounds.Min.Y).RGBA()
+	for y := bounds.Min.Y + offset; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r1, g1, b1, a1 := m.At(x, y).RGBA()
+			if r0 == r1 && g0 == g1 && b0 == b1 && a0 == a1 {
+				r0, g0, b0, a0 = r1, g1, b1, a1
+				continue
+			}
+			return count
+		}
+		count++
+	}
+	return count
 }
 
 func imageFromDecap(targetURL *url.URL, m *image.Image) error {
@@ -34,7 +71,7 @@ func imageFromDecap(targetURL *url.URL, m *image.Image) error {
 	fmt.Fprintf(os.Stderr, "delay (incl. global conf) was %d\n", delay)
 
 	req := decap.Request{
-		EmulateViewport: []string{"600", "1200", "mobile"},
+		EmulateViewport: []string{strconv.Itoa(OGImageWidth), "1200", "mobile"},
 		RenderDelay:     fmt.Sprintf("%dms", delay),
 		Timeout:         "10s",
 		Query: []*decap.QueryBlock{
@@ -104,7 +141,7 @@ func (c *Cache) initFallbackImage() {
 				break
 			}
 			sm := m.(SubImager)
-			m = sm.SubImage(image.Rect(0, 0, 600, 314))
+			m = sm.SubImage(image.Rect(0, 0, OGImageWidth, OGImageHeight))
 			var buf bytes.Buffer
 			if err = png.Encode(&buf, m); err != nil {
 				errMsg = err.Error()
