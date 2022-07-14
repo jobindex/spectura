@@ -67,7 +67,7 @@ func countSingleColoredRows(m image.Image, offset int) int {
 func imageFromDecap(targetURL *url.URL, m *image.Image) error {
 
 	extraDelay := getConfFromHostname(targetURL.Hostname()).Delay
-	delay := 2000 + extraDelay
+	delay := 2500 + extraDelay
 	fmt.Fprintf(os.Stderr, "delay (incl. global conf) was %d\n", delay)
 
 	req := decap.Request{
