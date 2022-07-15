@@ -36,8 +36,8 @@ func cropImage(m image.Image, voffset int) image.Image {
 	// If the image contains more than 30 background-looking rows, we remove
 	// some of them by cropping a bit lower.
 	count := countSingleColoredRows(m, voffset)
-	if count > 30 {
-		voffset += count - 30
+	if count > 25 {
+		voffset += count - 25
 	}
 
 	if maxVoffset := m.Bounds().Dy() - OGImageHeight; voffset > maxVoffset {
