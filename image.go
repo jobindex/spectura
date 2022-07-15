@@ -47,10 +47,11 @@ func cropImage(m image.Image, voffset int) image.Image {
 }
 
 func countSingleColoredRows(m image.Image, offset int) int {
-	bounds := m.Bounds()
 	count := 0
-	r0, g0, b0, a0 := m.At(bounds.Min.X, bounds.Min.Y).RGBA()
-	for y := bounds.Min.Y + offset; y < bounds.Max.Y; y++ {
+	bounds := m.Bounds()
+	minY := bounds.Min.Y + offset
+	r0, g0, b0, a0 := m.At(bounds.Min.X, minY).RGBA()
+	for y := minY; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			r1, g1, b1, a1 := m.At(x, y).RGBA()
 			if r0 == r1 && g0 == g1 && b0 == b1 && a0 == a1 {
