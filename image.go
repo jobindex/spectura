@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
 	"io"
 	"io/ioutil"
@@ -35,41 +36,106 @@ func cropImage(m image.Image, voffset int) image.Image {
 
 	// If the image contains more than 30 background-looking rows, we remove
 	// some of them by cropping a bit lower.
-	count := countSingleColoredRows(m, voffset)
-	if count > 25 {
-		voffset += count - 25
+	const maxTopMargin = 25
+	topMargin, color := countSingleColoredRows(m, voffset)
+	origTopMargin, origVoffset := topMargin, voffset
+	if topMargin > maxTopMargin {
+		voffset += topMargin - maxTopMargin
+		topMargin = maxTopMargin
 	}
+	logImgParam("vo", ", ", origVoffset, voffset)
+	logImgParam("tm", ", ", origTopMargin, topMargin)
+	origTopMargin, origVoffset = topMargin, voffset
 
-	if maxVoffset := m.Bounds().Dy() - OGImageHeight; voffset > maxVoffset {
-		voffset = maxVoffset
+	// We adjust cropping further by lowering the top margin to match any
+	// existing right-left margins within the first maxTopMargin*2 rows of the
+	// image.
+	cropRect := image.Rect(0, voffset, OGImageWidth, voffset+(maxTopMargin*2))
+	cropRect.Add(m.Bounds().Min)
+	leftMargin, rightMargin := leftRightMargins(m, cropRect, color)
+
+	var maxMargin int
+	if rightMargin > leftMargin || rightMargin == 0 {
+		maxMargin = leftMargin
+	} else {
+		maxMargin = rightMargin
 	}
-	return sm.SubImage(image.Rect(0, voffset, OGImageWidth, OGImageHeight+voffset))
+	if maxMargin > 0 && maxMargin < maxTopMargin {
+		maxMargin += (maxTopMargin - maxMargin) / 2
+	}
+	fmt.Fprintf(os.Stderr, "mm: %d/%d -> %d, ", leftMargin, rightMargin, maxMargin)
+
+	if maxMargin < topMargin {
+		voffset += topMargin - maxMargin
+	}
+	logImgParam("vo", "\n", origVoffset, voffset)
+
+	cropRect = image.Rect(0, voffset, OGImageWidth, voffset+OGImageHeight)
+	cropRect.Add(m.Bounds().Min)
+	return sm.SubImage(cropRect)
 }
 
-func countSingleColoredRows(m image.Image, offset int) int {
+func countSingleColoredRows(m image.Image, offset int) (int, color.Color) {
 	count := 0
 	bounds := m.Bounds()
 	minY := bounds.Min.Y + offset
-	r0, g0, b0, a0 := m.At(bounds.Min.X, minY).RGBA()
+	bgColor := m.At(bounds.Min.X, minY)
+
+	r0, g0, b0, a0 := bgColor.RGBA()
 	for y := minY; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			r1, g1, b1, a1 := m.At(x, y).RGBA()
 			if r0 == r1 && g0 == g1 && b0 == b1 && a0 == a1 {
-				r0, g0, b0, a0 = r1, g1, b1, a1
 				continue
 			}
-			return count
+			return count, bgColor
 		}
 		count++
 	}
-	return count
+	return count, bgColor
+}
+
+func leftRightMargins(m image.Image, r image.Rectangle, bgColor color.Color) (int, int) {
+	bounds := m.Bounds().Intersect(r)
+	minLeft, maxRight := bounds.Max.X-1, bounds.Min.X
+
+	r0, g0, b0, a0 := bgColor.RGBA()
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r1, g1, b1, a1 := m.At(x, y).RGBA()
+			if r0 == r1 && g0 == g1 && b0 == b1 && a0 == a1 {
+				continue
+			}
+			if x < minLeft {
+				minLeft = x
+			}
+			break
+		}
+		for x := bounds.Max.X - 1; x >= bounds.Min.X; x-- {
+			r1, g1, b1, a1 := m.At(x, y).RGBA()
+			if r0 == r1 && g0 == g1 && b0 == b1 && a0 == a1 {
+				continue
+			}
+			if x > maxRight {
+				maxRight = x
+			}
+			break
+		}
+		if minLeft == bounds.Min.X && maxRight == bounds.Max.X-1 {
+			break
+		}
+	}
+	return minLeft, bounds.Max.X - maxRight - 1
 }
 
 func imageFromDecap(targetURL *url.URL, m *image.Image) error {
 
 	extraDelay := getConfFromHostname(targetURL.Hostname()).Delay
 	delay := 2500 + extraDelay
-	fmt.Fprintf(os.Stderr, "delay (incl. global conf) was %d\n", delay)
+
+	fmt.Println(targetURL.String())
+	logImgParam("d0", ", ", 2500, delay)
+	logImgParam("d1", "\n", 1200)
 
 	req := decap.Request{
 		EmulateViewport: []string{strconv.Itoa(OGImageWidth), "1200", "mobile"},
@@ -89,8 +155,6 @@ func imageFromDecap(targetURL *url.URL, m *image.Image) error {
 			},
 		},
 	}
-
-	fmt.Println(targetURL.String())
 
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(req)
@@ -219,4 +283,19 @@ func loadImageConf() error {
 		}
 	}
 	return err
+}
+
+func logImgParam(name, sep string, param ...int) {
+	switch len(param) {
+	case 2:
+		old, new := param[0], param[1]
+		if old != new {
+			fmt.Fprintf(os.Stderr, "%s: %d -> %d%s", name, old, new, sep)
+			return
+		}
+		fallthrough
+	case 1:
+		par := param[0]
+		fmt.Fprintf(os.Stderr, "%s: %d%s", name, par, sep)
+	}
 }
