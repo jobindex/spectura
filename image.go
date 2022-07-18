@@ -43,8 +43,17 @@ func cropImage(m image.Image, voffset int) image.Image {
 		voffset += topMargin - maxTopMargin
 		topMargin = maxTopMargin
 	}
-	logImgParam("vo", ", ", origVoffset, voffset)
-	logImgParam("tm", ", ", origTopMargin, topMargin)
+
+	sep := ", "
+	diffColoredMargin, _ := countSingleColoredRows(m, origVoffset+origTopMargin)
+	if diffColoredMargin > maxTopMargin {
+		voffset += diffColoredMargin - maxTopMargin
+		topMargin = maxTopMargin
+		sep = " (~c), "
+	}
+
+	logImgParam("vo", sep, origVoffset, voffset)
+	logImgParam("tm", sep, origTopMargin, topMargin)
 	origTopMargin, origVoffset = topMargin, voffset
 
 	// We adjust cropping further by lowering the top margin to match any
