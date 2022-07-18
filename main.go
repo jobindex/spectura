@@ -142,6 +142,13 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 		case err == nil:
 			voffset := getConfFromHostname(targetURL.Hostname()).Voffset
 			m = cropImage(m, voffset)
+
+			if m.Bounds().Dy() < OGImageHeight {
+				cache.Write(entry)
+				entry = cache.Read(entry.URL)
+				break
+			}
+
 			var buf bytes.Buffer
 			if err = png.Encode(&buf, m); err != nil {
 				msg := fmt.Sprintf("failed to encode the generated PNG: %s", err)
