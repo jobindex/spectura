@@ -131,6 +131,24 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if query.Get("nocrop") != "" && !useSignatures {
+		var m image.Image
+		if err := imageFromDecap(targetURL, &m); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprintln(os.Stderr, "nocrop")
+		var buf bytes.Buffer
+		if err = png.Encode(&buf, m); err != nil {
+			msg := fmt.Sprintf("failed to encode the generated PNG: %s", err)
+			http.Error(w, msg, http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(buf.Bytes())
+		return
+	}
+
 	entry := cache.Read(targetURL.String())
 	if entry.IsEmpty() {
 		entry.Signature = signature
