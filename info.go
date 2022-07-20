@@ -1,86 +1,55 @@
 package main
 
 import (
-	"fmt"
-	"io"
+	"html/template"
+	"log"
 	"net/http"
 	"net/url"
-	"text/template"
 )
 
-const headerFmt = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
-<title>Spectura info</title>
-</head>
-<body>
-<div class="container">
-<table class="table table-hover">
-<thead>
-<tr>
-<td></td><td>%d screenshots, %s</td>
-</tr>
-</thead>
-<tbody>
-`
+type RenderableCacheEntry struct {
+	SpecturaUrl string
+	Size        string
+	Url         string
+}
 
-const footer = `</tbody>
-</table>
-</div>
-</body>
-</html>`
+type RenderableInfo struct {
+	CacheEntries []RenderableCacheEntry
+	TotalSize    string
+	TotalEntries int
+}
 
 func infoHandler(w http.ResponseWriter, req *http.Request) {
-
-	const rowFmt = `<tr>
-<td style="padding: 10px;"><img class="img-thumbnail" src="%s?%s"></td>
-<td><dl>
-<dt>Size</dt><dd>%s</dd>
-<dt>URL</dt><dd><a href="%s">%s</a></dd>
-</dl></td>
-</tr>
-`
+	tmpl := template.Must(template.ParseFiles("templates/info.tmpl"))
 	entries := cache.ReadAll()
 	size := 0
+	renderableEntries := []RenderableCacheEntry{}
 	for _, entry := range entries {
 		size += len(entry.Image)
+		renderableEntries = append(renderableEntries,
+			RenderableCacheEntry{
+				entry.specturaUrl(),
+				fmtByteSize(len(entry.Image)),
+				entry.URL,
+			})
 	}
-	fmt.Fprintf(w, headerFmt, len(entries), fmtByteSize(size))
-	for _, entry := range entries {
-		fmt.Fprintf(w, rowFmt,
-			screenshotPath,
-			entry.queryParams(),
-			fmtByteSize(len(entry.Image)),
-			template.HTMLEscapeString(entry.URL),
-			template.HTMLEscapeString(shortenURL(entry.URL, 80)),
-		)
+
+	err := tmpl.Execute(w, RenderableInfo{renderableEntries, fmtByteSize(size), len(entries)})
+	if err != nil {
+		panic(err)
 	}
-	io.WriteString(w, footer)
 }
 
-func shortenURL(url string, max int) string {
-	if len(url) <= max {
-		return url
+func (e *CacheEntry) specturaUrl() string {
+	specturaUrl, err := url.Parse(screenshotPath)
+	if err != nil {
+		log.Fatal("screenshotPath is not a valid URL")
 	}
-	if max < 3 {
-		max = 3
-	}
-	return fmt.Sprintf("%.*s...", max-3, url)
-}
-
-func (e *CacheEntry) queryParams() string {
+	query := specturaUrl.Query()
+	query.Set("url", e.URL)
 	if useSignatures {
-		return fmt.Sprintf(
-			"s=%s&url=%s",
-			template.HTMLEscapeString(url.QueryEscape(e.Signature)),
-			template.HTMLEscapeString(url.QueryEscape(e.URL)),
-		)
+		query.Set("s", e.Signature)
 	}
-	return fmt.Sprintf(
-		"url=%s",
-		template.HTMLEscapeString(url.QueryEscape(e.URL)),
-	)
+	specturaUrl.RawQuery = query.Encode()
+	return specturaUrl.String()
 }

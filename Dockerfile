@@ -9,6 +9,7 @@ RUN go mod download
 # copy sause
 COPY *.go *.json ./
 COPY decap/ ./decap/
+COPY templates/ ./templates/
 
 # build
 RUN go build
