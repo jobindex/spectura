@@ -133,7 +133,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 
 	if query.Get("nocrop") != "" && !useSignatures {
 		var m image.Image
-		if err := imageFromDecap(targetURL, &m); err != nil {
+		if err := imageFromDecap(&m, targetURL, true); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -155,12 +155,10 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 		entry.URL = targetURL.String()
 
 		var m image.Image
-		err = imageFromDecap(targetURL, &m)
+		err = imageFromDecap(&m, targetURL, true)
 		switch {
 		case err == nil:
-			voffset := getConfFromHostname(targetURL.Hostname()).Voffset
-			m = cropImage(m, voffset)
-
+			m = cropImage(m, targetURL)
 			if m.Bounds().Dy() < OGImageHeight {
 				cache.Write(entry)
 				entry = cache.Read(entry.URL)

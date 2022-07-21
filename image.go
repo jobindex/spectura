@@ -21,17 +21,24 @@ import (
 )
 
 const (
-	fallbackImageURL = "https://www.jobindex.dk/img/jobindex20/spectura_adshare.png"
-	imageConfPath    = "image_conf.json"
-	OGImageHeight    = 314
-	OGImageWidth     = 600
+	OGImageHeight     = 314
+	OGImageWidth      = 600
+	fallbackImageURL  = "https://www.jobindex.dk/img/jobindex20/spectura_adshare.png"
+	fastFollowupDelay = 1250 * time.Millisecond
+	fastInitDelay     = 2500 * time.Millisecond
+	fastTimeout       = 10 * time.Second
+	imageConfPath     = "image_conf.json"
+	slowFollowupDelay = 5 * time.Second
+	slowInitDelay     = 10 * time.Second
+	slowTimeout       = 25 * time.Second
 )
 
 type SubImager interface {
 	SubImage(r image.Rectangle) image.Image
 }
 
-func cropImage(m image.Image, voffset int) image.Image {
+func cropImage(m image.Image, targetURL *url.URL) image.Image {
+	voffset := getConfFromHostname(targetURL.Hostname()).Voffset
 	sm := m.(SubImager)
 
 	// If the image contains more than 30 background-looking rows, we remove
@@ -137,28 +144,37 @@ func leftRightMargins(m image.Image, r image.Rectangle, bgColor color.Color) (in
 	return minLeft, bounds.Max.X - maxRight - 1
 }
 
-func imageFromDecap(targetURL *url.URL, m *image.Image) error {
+func imageFromDecap(m *image.Image, targetURL *url.URL, fast bool) error {
 
-	extraDelay := getConfFromHostname(targetURL.Hostname()).Delay
-	delay := 2500 + extraDelay
+	var d0, d1, timeout time.Duration
+	if fast {
+		d0 = fastInitDelay
+		d0 += getConfFromHostname(targetURL.Hostname()).DelayDuration()
+		d1 = fastFollowupDelay
+		timeout = fastTimeout
+	} else {
+		d0 = slowInitDelay
+		d1 = slowFollowupDelay
+		timeout = slowTimeout
+	}
 
 	fmt.Println(targetURL.String())
-	logImgParam("d0", ", ", 2500, delay)
-	logImgParam("d1", "\n", 1200)
+	logImgParam("d0", ", ", int(d0.Milliseconds()))
+	logImgParam("d1", "\n", int(d1.Milliseconds()))
 
 	req := decap.Request{
 		EmulateViewport: []string{strconv.Itoa(OGImageWidth), "1200", "mobile"},
-		RenderDelay:     fmt.Sprintf("%dms", delay),
-		Timeout:         "10s",
+		RenderDelay:     d0.String(),
+		Timeout:         timeout.String(),
 		Query: []*decap.QueryBlock{
 			{
 				Actions: []decap.Action{
 					decapAction("navigate", targetURL.String()),
-					decapAction("sleep"),
+					decapAction("sleep", d0.String()),
 					decapAction("remove_info_boxes"),
 					decapAction("remove_nav_sections"),
 					decapAction("hide_nav_buttons"),
-					decapAction("sleep", "1200ms"),
+					decapAction("sleep", d1.String()),
 					decapAction("screenshot"),
 				},
 			},
@@ -251,6 +267,15 @@ func encodeEmptyPNG(width, height int) []byte {
 type imageConfEntry struct {
 	Delay   int `json:"delay"`
 	Voffset int `json:"voffset"`
+}
+
+func (c imageConfEntry) DelayDuration() time.Duration {
+	d, err := time.ParseDuration(fmt.Sprintf("%dms", c.Delay))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Bad millisecond configuration: %s", err)
+		return 0
+	}
+	return d
 }
 
 var globalImageConf map[string]imageConfEntry
