@@ -20,7 +20,13 @@ type RenderableInfo struct {
 }
 
 func infoHandler(w http.ResponseWriter, req *http.Request) {
-	tmpl := template.Must(template.ParseFiles("templates/info.tmpl"))
+	query := req.URL.Query()
+    var tmpl *template.Template
+    if (query.Get("grid") == "") {
+        tmpl = template.Must(template.ParseFiles("templates/info.tmpl"))
+    } else {
+        tmpl = template.Must(template.ParseFiles("templates/grid.tmpl"))
+    }
 	entries := cache.ReadAll()
 	size := 0
 	renderableEntries := []RenderableCacheEntry{}
