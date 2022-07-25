@@ -1,10 +1,13 @@
 package main
 
 import (
+    "math"
+    "math/rand"
+	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"net/url"
+	"os"
 )
 
 type RenderableCacheEntry struct {
@@ -19,14 +22,17 @@ type RenderableInfo struct {
 	TotalEntries int
 }
 
+var infoTmpl = template.Must(template.ParseFiles("templates/info.tmpl.html"))
+var gridTmpl = template.Must(template.ParseFiles("templates/grid.tmpl.html"))
+
 func infoHandler(w http.ResponseWriter, req *http.Request) {
 	query := req.URL.Query()
-    var tmpl *template.Template
-    if (query.Get("grid") == "") {
-        tmpl = template.Must(template.ParseFiles("templates/info.tmpl"))
-    } else {
-        tmpl = template.Must(template.ParseFiles("templates/grid.tmpl"))
-    }
+	var tmpl *template.Template
+	if query.Get("grid") == "" {
+        tmpl = infoTmpl
+	} else {
+        tmpl = gridTmpl
+	}
 	entries := cache.ReadAll()
 	size := 0
 	renderableEntries := []RenderableCacheEntry{}
@@ -42,15 +48,21 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 
 	err := tmpl.Execute(w, RenderableInfo{renderableEntries, fmtByteSize(size), len(entries)})
 	if err != nil {
-		panic(err)
+        errId := rand.Intn(int(math.Pow10(8)));
+
+        // log internal err message
+        internalMsg := fmt.Sprintf("Error %d: Failed to execute template: %s", errId, err)
+		fmt.Fprintf(os.Stderr, internalMsg)
+
+        // return external err message
+        externalMsg := fmt.Sprintf("Error %d: Failed to execute template", errId)
+		http.Error(w, externalMsg, http.StatusBadRequest)
+		return
 	}
 }
 
 func (e *CacheEntry) specturaUrl() string {
-	specturaUrl, err := url.Parse(screenshotPath)
-	if err != nil {
-		log.Fatal("screenshotPath is not a valid URL")
-	}
+	specturaUrl, _ := url.Parse(screenshotPath)
 	query := specturaUrl.Query()
 	query.Set("url", e.URL)
 	if useSignatures {
