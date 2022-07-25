@@ -1,23 +1,17 @@
 package main
 
 import (
-    "math"
-    "math/rand"
 	"fmt"
 	"html/template"
+	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 )
 
-type RenderableCacheEntry struct {
-	SpecturaUrl string
-	Size        string
-	Url         string
-}
-
 type RenderableInfo struct {
-	CacheEntries []RenderableCacheEntry
+	CacheEntries []CacheEntry
 	TotalSize    string
 	TotalEntries int
 }
@@ -29,45 +23,42 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	query := req.URL.Query()
 	var tmpl *template.Template
 	if query.Get("grid") == "" {
-        tmpl = infoTmpl
+		tmpl = infoTmpl
 	} else {
-        tmpl = gridTmpl
+		tmpl = gridTmpl
 	}
 	entries := cache.ReadAll()
 	size := 0
-	renderableEntries := []RenderableCacheEntry{}
 	for _, entry := range entries {
 		size += len(entry.Image)
-		renderableEntries = append(renderableEntries,
-			RenderableCacheEntry{
-				entry.specturaUrl(),
-				fmtByteSize(len(entry.Image)),
-				entry.URL,
-			})
 	}
 
-	err := tmpl.Execute(w, RenderableInfo{renderableEntries, fmtByteSize(size), len(entries)})
+	err := tmpl.Execute(w, RenderableInfo{entries, fmtByteSize(size), len(entries)})
 	if err != nil {
-        errId := rand.Intn(int(math.Pow10(8)));
+		errId := rand.Intn(int(math.Pow10(8)))
 
-        // log internal err message
-        internalMsg := fmt.Sprintf("Error %d: Failed to execute template: %s", errId, err)
+		// log internal err message
+		internalMsg := fmt.Sprintf("Error %d: Failed to execute template: %s", errId, err)
 		fmt.Fprintf(os.Stderr, internalMsg)
 
-        // return external err message
-        externalMsg := fmt.Sprintf("Error %d: Failed to execute template", errId)
+		// return external err message
+		externalMsg := fmt.Sprintf("Error %d: Failed to execute template", errId)
 		http.Error(w, externalMsg, http.StatusBadRequest)
 		return
 	}
 }
 
-func (e *CacheEntry) specturaUrl() string {
-	specturaUrl, _ := url.Parse(screenshotPath)
-	query := specturaUrl.Query()
+func (e *CacheEntry) FmtSize() string {
+	return fmtByteSize(len(e.Image))
+}
+
+func (e *CacheEntry) SpecturaURL() string {
+	specturaURL, _ := url.Parse(screenshotPath)
+	query := specturaURL.Query()
 	query.Set("url", e.URL)
 	if useSignatures {
 		query.Set("s", e.Signature)
 	}
-	specturaUrl.RawQuery = query.Encode()
-	return specturaUrl.String()
+	specturaURL.RawQuery = query.Encode()
+	return specturaURL.String()
 }
