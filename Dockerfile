@@ -1,4 +1,4 @@
-from golang:1.18.1
+from golang:1.18.1 as golang
 
 workdir /app
 
@@ -7,13 +7,19 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # copy sause
-COPY *.go *.json ./
+COPY *.go image_conf.json ./
 COPY decap/ ./decap/
 COPY templates/ ./templates/
 
 # build
 RUN go build
 
-RUN mv spectura /bin/
+from gcr.io/distroless/base-debian10
+
+workdir /app
+
+COPY --from=golang /app/spectura /bin/spectura
+COPY --from=golang /app/image_conf.json image_conf.json
+COPY --from=golang /app/templates templates
 
 CMD ["spectura"]
