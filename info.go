@@ -2,85 +2,63 @@ package main
 
 import (
 	"fmt"
-	"io"
+	"html/template"
+	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
-	"text/template"
+	"os"
 )
 
-const headerFmt = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
-<title>Spectura info</title>
-</head>
-<body>
-<div class="container">
-<table class="table table-hover">
-<thead>
-<tr>
-<td></td><td>%d screenshots, %s</td>
-</tr>
-</thead>
-<tbody>
-`
+type RenderableInfo struct {
+	CacheEntries []CacheEntry
+	TotalSize    string
+	TotalEntries int
+}
 
-const footer = `</tbody>
-</table>
-</div>
-</body>
-</html>`
+var infoTmpl = template.Must(template.ParseFiles("templates/info.tmpl.html"))
+var gridTmpl = template.Must(template.ParseFiles("templates/grid.tmpl.html"))
 
 func infoHandler(w http.ResponseWriter, req *http.Request) {
-
-	const rowFmt = `<tr>
-<td style="padding: 10px;"><img class="img-thumbnail" src="%s?%s"></td>
-<td><dl>
-<dt>Size</dt><dd>%s</dd>
-<dt>URL</dt><dd><a href="%s">%s</a></dd>
-</dl></td>
-</tr>
-`
+	query := req.URL.Query()
+	var tmpl *template.Template
+	if query.Get("grid") == "" {
+		tmpl = infoTmpl
+	} else {
+		tmpl = gridTmpl
+	}
 	entries := cache.ReadAll()
 	size := 0
 	for _, entry := range entries {
 		size += len(entry.Image)
 	}
-	fmt.Fprintf(w, headerFmt, len(entries), fmtByteSize(size))
-	for _, entry := range entries {
-		fmt.Fprintf(w, rowFmt,
-			screenshotPath,
-			entry.queryParams(),
-			fmtByteSize(len(entry.Image)),
-			template.HTMLEscapeString(entry.URL),
-			template.HTMLEscapeString(shortenURL(entry.URL, 80)),
-		)
+
+	err := tmpl.Execute(w, RenderableInfo{entries, fmtByteSize(size), len(entries)})
+	if err != nil {
+		errId := rand.Intn(int(math.Pow10(8)))
+
+		// log internal err message
+		internalMsg := fmt.Sprintf("Error %d: Failed to execute template: %s", errId, err)
+		fmt.Fprintf(os.Stderr, internalMsg)
+
+		// return external err message
+		externalMsg := fmt.Sprintf("Error %d: Failed to execute template", errId)
+		http.Error(w, externalMsg, http.StatusInternalServerError)
+		return
 	}
-	io.WriteString(w, footer)
 }
 
-func shortenURL(url string, max int) string {
-	if len(url) <= max {
-		return url
-	}
-	if max < 3 {
-		max = 3
-	}
-	return fmt.Sprintf("%.*s...", max-3, url)
+func (e *CacheEntry) FmtSize() string {
+	return fmtByteSize(len(e.Image))
 }
 
-func (e *CacheEntry) queryParams() string {
+func (e *CacheEntry) SpecturaURL() string {
+	specturaURL, _ := url.Parse(screenshotPath)
+	query := specturaURL.Query()
+	query.Set("url", e.URL)
 	if useSignatures {
-		return fmt.Sprintf(
-			"s=%s&url=%s",
-			template.HTMLEscapeString(url.QueryEscape(e.Signature)),
-			template.HTMLEscapeString(url.QueryEscape(e.URL)),
-		)
+		query.Set("s", e.Signature)
 	}
-	return fmt.Sprintf(
-		"url=%s",
-		template.HTMLEscapeString(url.QueryEscape(e.URL)),
-	)
+	specturaURL.RawQuery = query.Encode()
+	return specturaURL.String()
 }

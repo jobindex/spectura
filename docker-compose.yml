@@ -3,9 +3,12 @@ services:
   spectura:
     environment:
       "DECAP_URL": "http://decap:4531"
+      "USE_SIGNATURES": "false"
       "SIGNING_SECRET": "secret"
       "SIGNING_KEY": "key"
       "SIGNING_UNIQUE_NAME": "jix_spectura"
+    volumes:
+      - "./templates:/app/templates"
     depends_on:
       - decap
     build:
