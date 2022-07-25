@@ -43,7 +43,7 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 
 		// return external err message
 		externalMsg := fmt.Sprintf("Error %d: Failed to execute template", errId)
-		http.Error(w, externalMsg, http.StatusBadRequest)
+		http.Error(w, externalMsg, http.StatusInternalServerError)
 		return
 	}
 }
