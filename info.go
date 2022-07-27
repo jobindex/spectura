@@ -55,7 +55,7 @@ func (e *CacheEntry) FmtSize() string {
 func (e *CacheEntry) SpecturaURL() string {
 	specturaURL, _ := url.Parse(screenshotPath)
 	query := specturaURL.Query()
-	query.Set("url", e.URL)
+	query.Set("url", e.URL.String())
 	if useSignatures {
 		query.Set("s", e.Signature)
 	}

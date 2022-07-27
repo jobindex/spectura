@@ -1,22 +1,20 @@
 package main
 
 import (
-    "math/rand"
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"image"
-	"image/png"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
+
 const (
 	port           = 19165
 	screenshotPath = "/api/spectura/v0/screenshot"
@@ -35,7 +33,7 @@ var (
 var cache Cache
 
 func main() {
-    rand.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 
 	cacheTTLString, _ := getenv("CACHE_TTL", "12h")
 	cacheTTL, err := time.ParseDuration(cacheTTLString)
@@ -134,60 +132,56 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if query.Get("nocrop") != "" && !useSignatures {
-		var m image.Image
-		if err := imageFromDecap(&m, targetURL, true); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
 		fmt.Fprintln(os.Stderr, "nocrop")
-		var buf bytes.Buffer
-		if err = png.Encode(&buf, m); err != nil {
-			msg := fmt.Sprintf("failed to encode the generated PNG: %s", err)
+
+		entry := CacheEntry{URL: targetURL}
+		err = entry.fetchAndCropImage(false, true)
+		if err != nil {
+			msg := fmt.Sprintf("nocrop fail: %s", err)
 			http.Error(w, msg, http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "image/png")
-		w.Write(buf.Bytes())
+		w.Write(entry.Image)
 		return
 	}
 
 	entry := cache.Read(targetURL.String())
+
+	if query.Get("bg") != "" {
+		if entry.IsEmpty() {
+			entry.URL = targetURL
+			entry.Signature = signature
+		} else {
+			elapsed := time.Since(entry.lastUpdated)
+			if elapsed < 3*time.Hour {
+				msg := fmt.Sprintf("%s since last background request", elapsed)
+				http.Error(w, msg, http.StatusTooManyRequests)
+			}
+		}
+
+		// TODO: Update timestamp in cache, so repeated queries are rejected
+		// 		 while the initial query is still being processed.
+
+		cache.RefreshEntry(entry)
+		return
+	}
+
 	if entry.IsEmpty() {
 		entry.Signature = signature
-		entry.URL = targetURL.String()
-
-		var m image.Image
-		err = imageFromDecap(&m, targetURL, true)
+		entry.URL = targetURL
+		err = entry.fetchAndCropImage(false, false)
 		switch {
 		case err == nil:
-			m = cropImage(m, targetURL)
-			if m.Bounds().Dy() < OGImageHeight {
-				cache.Write(entry)
-				entry = cache.Read(entry.URL)
-				break
-			}
-
-			var buf bytes.Buffer
-			if err = png.Encode(&buf, m); err != nil {
-				msg := fmt.Sprintf("failed to encode the generated PNG: %s", err)
-				http.Error(w, msg, http.StatusInternalServerError)
-				return
-			}
-			entry.Image = buf.Bytes()
-			if len(entry.Image) > maxImageSize {
-				fmt.Fprintf(os.Stderr, "Warning: Caching object (%s) larger than %s\n",
-					fmtByteSize(len(entry.Image)), fmtByteSize(maxImageSize))
-			}
 			cache.Write(entry)
-
-		case strings.Contains(err.Error(), "500 Internal Server Error"):
+		case errors.Is(err, croppingError) || errors.Is(err, decapInternalError):
 			cache.Write(entry)
-			entry = cache.Read(entry.URL)
-
+			entry = cache.Read(entry.URL.String())
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		cache.RefreshEntry(entry)
 	}
 	w.Header().Set("Content-Type", "image/png")
 	w.Write(entry.Image)
