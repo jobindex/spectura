@@ -153,15 +153,17 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 			entry.URL = targetURL
 			entry.Signature = signature
 		} else {
-			elapsed := time.Since(entry.lastUpdated)
+			elapsed := time.Since(entry.LastUpdated)
 			if elapsed < 3*time.Hour {
 				msg := fmt.Sprintf("%s since last background request", elapsed)
 				http.Error(w, msg, http.StatusTooManyRequests)
 			}
 		}
 
-		// TODO: Update timestamp in cache, so repeated queries are rejected
-		// 		 while the initial query is still being processed.
+		// Update timestamp in cache, so repeated queries are rejected
+		// while the initial query is still being processed.
+		entry.LastUpdated = time.Now()
+		cache.Write(entry)
 
 		cache.RefreshEntry(entry)
 		return

@@ -44,6 +44,24 @@
                       <a name="url" href="{{.URL}}">{{.URL}}</a>
                     </div>
                   </div>
+                  <div class="row">
+                    <div class="col"> <b>First</b> </div>
+                  </div>
+                  <div class="row">
+                    <div class="col">{{.First | formatDate}}</div>
+                  </div>
+                  <div class="row">
+                    <div class="col"> <b>LastUpdated</b> </div>
+                  </div>
+                  <div class="row">
+                    <div class="col">{{.LastUpdated | formatDate }}</div>
+                  </div>
+                  <div class="row">
+                    <div class="col"> <b>LastFetched</b> </div>
+                  </div>
+                  <div class="row">
+                    <div class="col">{{.LastFetched | formatDate}}</div>
+                  </div>
                 </div>
               </div>
             </div>

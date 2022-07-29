@@ -8,15 +8,14 @@ import (
 	"time"
 )
 
-// A CacheEntry wraps a PNG-encoded image to stored in a Cache. The screenshot
-// URL is used as the cache key.
+// A CacheEntry wraps a PNG-encoded image to stored in a Cache. The screenshot // URL is used as the cache key.
 type CacheEntry struct {
 	Image       []byte
 	Signature   string
 	URL         *url.URL
-	first       time.Time
-	lastUpdated time.Time
-	lastFetched time.Time
+	First       time.Time
+	LastUpdated time.Time
+	LastFetched time.Time
 }
 
 // IsEmpty reports whether e is a zero value CacheEntry.
@@ -100,28 +99,28 @@ func (c *Cache) serve() {
 			}
 			c.readReply <- replyEntry
 			if exists {
-				entry.lastFetched = time.Now()
+				entry.LastFetched = time.Now()
 				c.entries[url] = entry
 			}
 
 		case entry := <-c.writeQuery:
 			now := time.Now()
 			if oldEntry, exists := c.entries[entry.URL.String()]; exists {
-				entry.lastFetched = oldEntry.lastFetched
+				entry.LastFetched = oldEntry.LastFetched
 			} else {
-				entry.first = now
-				entry.lastFetched = now
+				entry.First = now
+				entry.LastFetched = now
 			}
-			entry.lastUpdated = now
+			entry.LastUpdated = now
 			c.entries[entry.URL.String()] = entry
 
-		// TODO: Auto-refresh cached images if time.Since(entry.lastUpdated)
+		// TODO: Auto-refresh cached images if time.Since(entry.LastUpdated)
 		// 	     is larger than e.g. 6 hours.
 
 		case <-purge.C:
 			size := 0
 			for url, entry := range c.entries {
-				elapsed := time.Since(entry.lastFetched)
+				elapsed := time.Since(entry.LastFetched)
 				if elapsed > c.ttl {
 					delete(c.entries, url)
 					fmt.Fprintf(os.Stderr, "Clearing cache entry %s\n", url)
