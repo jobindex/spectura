@@ -7,6 +7,7 @@ services:
       "SIGNING_SECRET": "secret"
       "SIGNING_KEY": "key"
       "SIGNING_UNIQUE_NAME": "jix_spectura"
+      "BG_RATE_LIMIT_TIME": "10s"
     volumes:
       - "./templates:/templates"
     depends_on:

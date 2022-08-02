@@ -28,6 +28,7 @@ var (
 	signingSecret     string
 	signingUniqueName string
 	useSignatures     bool
+	bgRateLimitTime   time.Duration
 )
 
 var cache Cache
@@ -39,6 +40,12 @@ func main() {
 	cacheTTL, err := time.ParseDuration(cacheTTLString)
 	if err != nil {
 		log.Fatalf(`CACHE_TTL must be a valid duration such as "12h": %s\n`, err)
+	}
+
+	bgRateLimitTimeString, _ := getenv("BG_RATE_LIMIT_TIME", "3h")
+	bgRateLimitTime, err = time.ParseDuration(bgRateLimitTimeString)
+	if err != nil {
+		log.Fatalf(`BG_RATE_LIMIT_TIME must be a valid duration such as "3h": %s\n`, err)
 	}
 
 	maxImageSizeString, _ := getenv("MAX_IMAGE_SIZE_MIB", "20")
@@ -154,7 +161,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 			entry.Signature = signature
 		} else {
 			elapsed := time.Since(entry.LastUpdated)
-			if elapsed < 3*time.Hour {
+			if elapsed < bgRateLimitTime {
 				msg := fmt.Sprintf("%s since last background request", elapsed)
 				http.Error(w, msg, http.StatusTooManyRequests)
 				return
