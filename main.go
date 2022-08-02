@@ -157,6 +157,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 			if elapsed < 3*time.Hour {
 				msg := fmt.Sprintf("%s since last background request", elapsed)
 				http.Error(w, msg, http.StatusTooManyRequests)
+				return
 			}
 		}
 
