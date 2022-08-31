@@ -1,7 +1,6 @@
 package main
 
 import (
-    "math/rand"
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha1"
@@ -10,6 +9,7 @@ import (
 	"image"
 	"image/png"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 )
+
 const (
 	port           = 19165
 	screenshotPath = "/api/spectura/v0/screenshot"
@@ -35,7 +36,7 @@ var (
 var cache Cache
 
 func main() {
-    rand.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 
 	cacheTTLString, _ := getenv("CACHE_TTL", "12h")
 	cacheTTL, err := time.ParseDuration(cacheTTLString)
