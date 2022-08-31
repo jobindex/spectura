@@ -14,6 +14,7 @@ type CacheEntry struct {
 	Signature string
 	URL       string
 	last      time.Time
+	Expire    time.Time
 }
 
 // IsEmpty reports whether e is a zero value CacheEntry.
