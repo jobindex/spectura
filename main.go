@@ -124,14 +124,14 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	expireRaw := query.Get("expire")
-	if expireRaw == "" {
-		http.Error(w, `Query param "expire" must be present`, http.StatusBadRequest)
-		return
-	}
-	expire, err := strconv.ParseInt(expireRaw, 10, 64)
-	if err != nil {
-		http.Error(w, `Query param "expire" must be a number`, http.StatusBadRequest)
-		return
+	var expire int64
+	if expireRaw != "" {
+		var err error
+		expire, err = strconv.ParseInt(expireRaw, 10, 64)
+		if err != nil {
+			http.Error(w, `Query param "expire" must be a number`, http.StatusBadRequest)
+			return
+		}
 	}
 
 	targetURL, err := url.Parse(rawURL)
@@ -143,6 +143,12 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 	if useSignatures && !checkSignature(targetURL.String(), signature, expireRaw) {
 		http.Error(w, "Signature check failed", http.StatusBadRequest)
 		return
+	}
+
+	if expire != 0 && time.Unix(expire, 0).After(time.Now()) {
+		// Return the fallback image
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(entry.Image)
 	}
 
 	if query.Get("nocrop") != "" && !useSignatures {
@@ -167,7 +173,9 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 	if entry.IsEmpty() {
 		entry.Signature = signature
 		entry.URL = targetURL.String()
-		entry.Expire = time.Unix(expire, 0)
+		if expire != 0 {
+			entry.Expire = time.Unix(expire, 0)
+		}
 
 		var m image.Image
 		err = imageFromDecap(&m, targetURL, true)
