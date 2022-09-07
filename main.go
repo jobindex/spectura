@@ -172,11 +172,9 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 
 	entry := cache.Read(targetURL.String())
 	if entry.IsEmpty() {
+		entry.Expire = time.Unix(expire, 0)
 		entry.Signature = signature
 		entry.URL = targetURL.String()
-		if expire != 0 {
-			entry.Expire = time.Unix(expire, 0)
-		}
 
 		var m image.Image
 		err = imageFromDecap(&m, targetURL, true)
