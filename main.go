@@ -125,6 +125,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 
 	expireRaw := query.Get("expire")
 	var expire int64
+	// Conditions where expire is left as 0, are handled after signature check.
 	if expireRaw != "" {
 		var err error
 		expire, err = strconv.ParseInt(expireRaw, 10, 64)
@@ -145,10 +146,10 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if expire != 0 && time.Unix(expire, 0).After(time.Now()) {
-		// Return the fallback image
-		w.Header().Set("Content-Type", "image/png")
-		w.Write(entry.Image)
+	if expire == 0 || time.Now().After(time.Unix(expire, 0)) {
+		// Redirect to fallback image
+		http.Redirect(w, req, fallbackImageURL, http.StatusFound)
+		return
 	}
 
 	if query.Get("nocrop") != "" && !useSignatures {
