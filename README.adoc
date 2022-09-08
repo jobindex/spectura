@@ -49,13 +49,13 @@ To test Spectura with `curl`
 
 [source,shell]
 ----
-curl 'http://localhost:8080/api/spectura/v0/screenshot?s=555426697a26bb43af02808665f0b9ae3726f5eb&url=https://pyjam.as'
+curl 'http://localhost:8080/api/spectura/v0/screenshot?url=https://pyjam.as&expire=1661810399&'
 ----
 
 If you use kitty terminal you can print the image directly in your terminal
 [source,shell]
 ----
-curl 'http://localhost:8080/api/spectura/v0/screenshot?s=555426697a26bb43af02808665f0b9ae3726f5eb&url=https://pyjam.as' | kitty +kitten icat
+curl 'http://localhost:8080/api/spectura/v0/screenshot?&url=https://pyjam.as&expire=1661810399&' | kitty +kitten icat
 ----
 
 == Configuration

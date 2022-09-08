@@ -103,9 +103,9 @@ func getenv(key string, fallback ...string) (string, error) {
 }
 
 // Check a JIX::UrlSignature hash signature
-func checkSignature(url string, signature string) bool {
+func checkSignature(url string, signature string, expire string) bool {
 	h := hmac.New(sha1.New, []byte(signingKey))
-	h.Write([]byte(signingUniqueName + ":" + url + signingSecret))
+	h.Write([]byte(signingUniqueName + ":" + url + expire + signingSecret))
 	signatureShouldBe := hex.EncodeToString(h.Sum(nil))
 	return signature == signatureShouldBe
 }
@@ -123,14 +123,32 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	expireRaw := query.Get("expire")
+	var expire int64
+	// Conditions where expire is left as 0, are handled after signature check.
+	if expireRaw != "" {
+		var err error
+		expire, err = strconv.ParseInt(expireRaw, 10, 64)
+		if err != nil {
+			http.Error(w, `Query param "expire" must be a number`, http.StatusBadRequest)
+			return
+		}
+	}
+
 	targetURL, err := url.Parse(rawURL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if useSignatures && !checkSignature(targetURL.String(), signature) {
+	if useSignatures && !checkSignature(targetURL.String(), signature, expireRaw) {
 		http.Error(w, "Signature check failed", http.StatusBadRequest)
+		return
+	}
+
+	if expire == 0 || time.Now().After(time.Unix(expire, 0)) {
+		// Redirect to fallback image
+		http.Redirect(w, req, fallbackImageURL, http.StatusFound)
 		return
 	}
 
@@ -154,6 +172,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 
 	entry := cache.Read(targetURL.String())
 	if entry.IsEmpty() {
+		entry.Expire = time.Unix(expire, 0)
 		entry.Signature = signature
 		entry.URL = targetURL.String()
 

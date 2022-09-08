@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
+	"time"
 )
 
 type RenderableInfo struct {
@@ -16,8 +18,17 @@ type RenderableInfo struct {
 	TotalEntries int
 }
 
-var infoTmpl = template.Must(template.ParseFiles("templates/info.tmpl.html"))
-var gridTmpl = template.Must(template.ParseFiles("templates/grid.tmpl.html"))
+func formatDate(date time.Time) string {
+	return date.Format(time.UnixDate)
+}
+
+var funcMap = template.FuncMap{
+	// The name "title" is what the function will be called in the template text.
+	"formatDate": formatDate,
+}
+
+var infoTmpl = template.Must(template.New("info.tmpl.html").Funcs(funcMap).ParseFiles("templates/info.tmpl.html"))
+var gridTmpl = template.Must(template.New("grid.tmpl.html").Funcs(funcMap).ParseFiles("templates/grid.tmpl.html"))
 
 func infoHandler(w http.ResponseWriter, req *http.Request) {
 	query := req.URL.Query()
@@ -39,7 +50,7 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 
 		// log internal err message
 		internalMsg := fmt.Sprintf("Error %d: Failed to execute template: %s", errId, err)
-		fmt.Fprintf(os.Stderr, internalMsg)
+		fmt.Fprintln(os.Stderr, internalMsg)
 
 		// return external err message
 		externalMsg := fmt.Sprintf("Error %d: Failed to execute template", errId)
@@ -56,6 +67,7 @@ func (e *CacheEntry) SpecturaURL() string {
 	specturaURL, _ := url.Parse(screenshotPath)
 	query := specturaURL.Query()
 	query.Set("url", e.URL)
+	query.Set("expire", strconv.FormatInt(e.Expire.Unix(), 10))
 	if useSignatures {
 		query.Set("s", e.Signature)
 	}
