@@ -28,27 +28,29 @@ func (e *CacheEntry) IsFailedImage() bool {
 	return e.URL != nil && e.Image == nil
 }
 
-// merge updates the fields in CacheEntry e based on the fields in o.
+// merge creates a new CacheEntry based on two existing entries, old and new.
 //
-// Image is always updated, and LastUpdated is set to the time of the merge.
+// old's Expire and URL are always kept.
 //
-// First and Signature are updated if they were previously empty.
+// new's Image is always used, and new's First or Signature are used if old's
+// were empty.
 //
-// LastFetched is updated if it contains a newer timestamp.
+// Either old's or new's LastFetched is used, whichever is newer.
 //
-// Expire and URL are never updated.
-func (e *CacheEntry) merge(o CacheEntry) {
-	e.Image = o.Image
-	e.LastUpdated = time.Now()
-	if e.Signature == "" {
-		e.Signature = o.Signature
+// LastUpdated is set to the time of the merge.
+func merge(old, new CacheEntry) CacheEntry {
+	old.Image = new.Image
+	old.LastUpdated = time.Now()
+	if old.Signature == "" {
+		old.Signature = new.Signature
 	}
-	if e.First.IsZero() {
-		e.First = o.First
+	if old.First.IsZero() {
+		old.First = new.First
 	}
-	if o.LastFetched.After(e.LastFetched) {
-		e.LastFetched = o.LastFetched
+	if new.LastFetched.After(old.LastFetched) {
+		old.LastFetched = new.LastFetched
 	}
+	return old
 }
 
 // A Cache is an in-memory key-value store of recently accessed CacheEntry
@@ -133,7 +135,7 @@ func (c *Cache) serve() {
 
 		case entry := <-c.writeQuery:
 			if oldEntry, exists := c.entries[entry.URL.String()]; exists {
-				oldEntry.merge(entry)
+				entry = merge(oldEntry, entry)
 			} else {
 				now := time.Now()
 				entry.First = now
