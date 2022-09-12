@@ -8,7 +8,8 @@ import (
 	"time"
 )
 
-// A CacheEntry wraps a PNG-encoded image to stored in a Cache. The screenshot // URL is used as the cache key.
+// A CacheEntry wraps a PNG-encoded image to stored in a Cache. The screenshot
+// URL is used as the cache key.
 type CacheEntry struct {
 	Expire      time.Time
 	Image       []byte
