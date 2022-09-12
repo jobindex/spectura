@@ -20,36 +20,56 @@
       </div>
       {{range .CacheEntries}}
         <div class="card mb-3">
+          <div class="card-header">
+            <b>URL:</b>
+            <a name="url" href="{{.URL}}"> {{.URL}} </a>
+          </div>
           <div class="card-body">
             <div class="row">
-              <div class="col-6">
-                <img class="img-thumbnail" src="{{ .SpecturaURL }}" />
-              </div>
               <div class="col">
                 <div class="row">
+                  <div class="col-3">
+                    <b>Size:</b>
+                  </div>
                   <div class="col">
-                    <b>Size</b>
+                    {{.FmtSize}}
                   </div>
                 </div>
                 <div class="row">
-                  <div class="col">{{.FmtSize}}</div>
-                </div>
-                <div class="row">
+                  <div class="col-3">
+                    <b>First:</b>
+                  </div>
                   <div class="col">
-                    <b>URL</b>
+                    {{.First | formatDate}}
                   </div>
                 </div>
                 <div class="row">
+                  <div class="col-3">
+                    <b>LastUpdated:</b>
+                  </div>
                   <div class="col">
-                    <a name="url" href="{{.URL}}"> {{.URL}} </a>
+                    {{.LastUpdated | formatDate }}
                   </div>
                 </div>
                 <div class="row">
-                  <div class="col"> <b>Expire</b> </div>
+                  <div class="col-3">
+                    <b>LastFetched:</b>
+                  </div>
+                  <div class="col">
+                    {{.LastFetched | formatDate}}
+                  </div>
                 </div>
                 <div class="row">
-                  <div class="col">{{.Expire | formatDate}}</div>
+                  <div class="col-3">
+                    <b>Expire:</b>
+                  </div>
+                  <div class="col">
+                    {{.Expire | formatDate}}
+                  </div>
                 </div>
+              </div>
+              <div class="col-6">
+                <img class="img-thumbnail" src="{{ .SpecturaURL }}" />
               </div>
             </div>
           </div>

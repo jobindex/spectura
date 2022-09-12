@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/bits"
+	"net/url"
 	"os"
 	"time"
 )
@@ -10,20 +11,47 @@ import (
 // A CacheEntry wraps a PNG-encoded image to stored in a Cache. The screenshot
 // URL is used as the cache key.
 type CacheEntry struct {
-	Image     []byte
-	Signature string
-	URL       string
-	last      time.Time
-	Expire    time.Time
+	Expire      time.Time
+	Image       []byte
+	Signature   string
+	URL         *url.URL
+	First       time.Time
+	LastUpdated time.Time
+	LastFetched time.Time
 }
 
 // IsEmpty reports whether e is a zero value CacheEntry.
 func (e *CacheEntry) IsEmpty() bool {
-	return e.Image == nil && e.Signature == "" && e.URL == ""
+	return e.Image == nil && e.Signature == "" && e.URL == nil
 }
 
 func (e *CacheEntry) IsFailedImage() bool {
-	return e.URL != "" && e.Image == nil
+	return e.URL != nil && e.Image == nil
+}
+
+// merge creates a new CacheEntry based on two existing entries, old and new.
+//
+// old's Expire and URL are always kept.
+//
+// new's Image is always used, and new's First or Signature are used if old's
+// were empty.
+//
+// Either old's or new's LastFetched is used, whichever is newer.
+//
+// LastUpdated is set to the time of the merge.
+func merge(old, new CacheEntry) CacheEntry {
+	old.Image = new.Image
+	old.LastUpdated = time.Now()
+	if old.Signature == "" {
+		old.Signature = new.Signature
+	}
+	if old.First.IsZero() {
+		old.First = new.First
+	}
+	if new.LastFetched.After(old.LastFetched) {
+		old.LastFetched = new.LastFetched
+	}
+	return old
 }
 
 // A Cache is an in-memory key-value store of recently accessed CacheEntry
@@ -38,6 +66,7 @@ type Cache struct {
 	readReply, writeQuery chan CacheEntry
 	readAllQuery          chan struct{}
 	readAllReply          chan []CacheEntry
+	refreshQueue          chan chan struct{}
 	ttl                   time.Duration
 }
 
@@ -52,10 +81,12 @@ func (c *Cache) Init(ttl time.Duration) {
 		writeQuery:    make(chan CacheEntry),
 		readAllQuery:  make(chan struct{}),
 		readAllReply:  make(chan []CacheEntry),
+		refreshQueue:  make(chan chan struct{}, 10),
 		ttl:           ttl,
 	}
 	go c.initFallbackImage()
 	go c.serve()
+	go c.scheduleRefresh()
 }
 
 func (c *Cache) ReadAll() []CacheEntry {
@@ -71,6 +102,10 @@ func (c *Cache) Read(url string) CacheEntry {
 }
 
 // Write writes a CacheEntry to the cache, using entry.URL as the key.
+//
+// If the entry already exists, the cached image is overwritten. The client is
+// responsible for avoiding wasteful updates (i.e. overwriting an image with an
+// identical one).
 func (c *Cache) Write(entry CacheEntry) {
 	c.writeQuery <- entry
 }
@@ -95,18 +130,28 @@ func (c *Cache) serve() {
 			}
 			c.readReply <- replyEntry
 			if exists {
-				entry.last = time.Now()
+				entry.LastFetched = time.Now()
 				c.entries[url] = entry
 			}
 
 		case entry := <-c.writeQuery:
-			entry.last = time.Now()
-			c.entries[entry.URL] = entry
+			if oldEntry, exists := c.entries[entry.URL.String()]; exists {
+				entry = merge(oldEntry, entry)
+			} else {
+				now := time.Now()
+				entry.First = now
+				entry.LastFetched = now
+				entry.LastUpdated = now
+			}
+			c.entries[entry.URL.String()] = entry
+
+		// TODO: Auto-refresh cached images if time.Since(entry.LastUpdated)
+		// 	     is larger than e.g. 6 hours.
 
 		case <-purge.C:
 			size := 0
 			for url, entry := range c.entries {
-				elapsed := time.Since(entry.last)
+				elapsed := time.Since(entry.LastUpdated)
 				if elapsed > c.ttl {
 					delete(c.entries, url)
 					fmt.Fprintf(os.Stderr, "Clearing cache entry %s\n", url)
@@ -118,6 +163,35 @@ func (c *Cache) serve() {
 				time.Now().Format("[15:04:05]"), len(c.entries), fmtByteSize(size))
 		}
 	}
+}
+
+// RefreshEntry queues a background job to capture a fresh screenshot for the
+// cache entry and saves it in the cache. The Decap request uses longer sleep
+// intervals than the one used for synchronous Spectura requests, which
+// typically produces better screenshots.
+func (c *Cache) RefreshEntry(e CacheEntry) {
+	go c.runRefreshTask(e)
+}
+
+func (c *Cache) scheduleRefresh() {
+	for {
+		<-c.refreshQueue <- struct{}{}
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func (c *Cache) runRefreshTask(e CacheEntry) {
+	schedule := make(chan struct{})
+	c.refreshQueue <- schedule
+	<-schedule
+	if err := e.fetchAndCropImage(true, false); err != nil {
+		fmt.Fprintf(os.Stderr, "Giving up on image refresh: %s", err)
+		return
+	}
+	cache.Write(e)
+
+	// TODO: Only write the new image to cache if it is more information dense
+	//       than the previous image.
 }
 
 func fmtByteSize(n int) string {

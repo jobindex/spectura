@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -39,6 +40,9 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 		tmpl = gridTmpl
 	}
 	entries := cache.ReadAll()
+	sort.SliceStable(entries, func(i, j int) bool {
+		return entries[i].First.After(entries[j].First)
+	})
 	size := 0
 	for _, entry := range entries {
 		size += len(entry.Image)
@@ -66,7 +70,7 @@ func (e *CacheEntry) FmtSize() string {
 func (e *CacheEntry) SpecturaURL() string {
 	specturaURL, _ := url.Parse(screenshotPath)
 	query := specturaURL.Query()
-	query.Set("url", e.URL)
+	query.Set("url", e.URL.String())
 	query.Set("expire", strconv.FormatInt(e.Expire.Unix(), 10))
 	if useSignatures {
 		query.Set("s", e.Signature)

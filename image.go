@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -33,8 +34,38 @@ const (
 	slowTimeout       = 25 * time.Second
 )
 
+var (
+	croppingError      = errors.New("crop failure")
+	decapInternalError = errors.New("internal Decap error")
+	decapRequestError  = errors.New("Decap error")
+)
+
 type SubImager interface {
 	SubImage(r image.Rectangle) image.Image
+}
+
+func (entry *CacheEntry) fetchAndCropImage(background, nocrop bool) error {
+	var m image.Image
+	err := imageFromDecap(&m, entry.URL, !background)
+	if err != nil {
+		return err
+	}
+	if !nocrop {
+		m = cropImage(m, entry.URL)
+		if m.Bounds().Dy() < OGImageHeight {
+			return croppingError
+		}
+	}
+	var buf bytes.Buffer
+	if err = png.Encode(&buf, m); err != nil {
+		return fmt.Errorf("failed to encode the generated PNG: %w", err)
+	}
+	entry.Image = buf.Bytes()
+	if len(entry.Image) > maxImageSize {
+		fmt.Fprintf(os.Stderr, "Warning: Size of generated image (%s) exceeds %s\n",
+			fmtByteSize(len(entry.Image)), fmtByteSize(maxImageSize))
+	}
+	return nil
 }
 
 func cropImage(m image.Image, targetURL *url.URL) image.Image {
@@ -145,7 +176,6 @@ func leftRightMargins(m image.Image, r image.Rectangle, bgColor color.Color) (in
 }
 
 func imageFromDecap(m *image.Image, targetURL *url.URL, fast bool) error {
-
 	var d0, d1, timeout time.Duration
 	if fast {
 		d0 = fastInitDelay
@@ -184,23 +214,25 @@ func imageFromDecap(m *image.Image, targetURL *url.URL, fast bool) error {
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(req)
 	if err != nil {
-		return fmt.Errorf("couldn't encode JSON response body: %s", err)
+		return fmt.Errorf("couldn't encode JSON response body: %w", err)
 	}
 
 	var res *http.Response
 	res, err = http.Post(fmt.Sprintf("%s/api/decap/v0/browse", decapURL), "application/json", &buf)
 	if err != nil {
-		return fmt.Errorf("couldn't connect to Decap: %s", err)
+		return fmt.Errorf("couldn't connect to Decap: %w", err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/png" {
 		msg, _ := io.ReadAll(res.Body)
-		return fmt.Errorf(
-			"unsuccesful Decap request: %s; %s", res.Status, msg)
+		if res.StatusCode == 500 {
+			return fmt.Errorf("%w: %s; %s", decapInternalError, res.Status, msg)
+		}
+		return fmt.Errorf("%w: %s; %s", decapRequestError, res.Status, msg)
 	}
 
 	if *m, err = png.Decode(res.Body); err != nil {
-		return fmt.Errorf("couldn't decode PNG from Decap: %s", err)
+		return fmt.Errorf("couldn't decode PNG from Decap: %w", err)
 	}
 	return nil
 }
@@ -272,7 +304,7 @@ type imageConfEntry struct {
 func (c imageConfEntry) DelayDuration() time.Duration {
 	d, err := time.ParseDuration(fmt.Sprintf("%dms", c.Delay))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Bad millisecond configuration: %s", err)
+		fmt.Fprintf(os.Stderr, "Bad millisecond configuration: %w", err)
 		return 0
 	}
 	return d
