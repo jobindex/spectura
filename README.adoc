@@ -65,5 +65,5 @@ curl 'http://localhost:8080/api/spectura/v0/screenshot?s=555426697a26bb43af02808
 * `SIGNING_SECRET`, required if `USE_SIGNATURES`
 * `SIGNING_KEY`, required if `USE_SIGNATURES`
 * `SIGNING_UNIQUE_NAME`, optional, default: `jix_spectura`
-* `CACHE_TTL`, optional, default: `12h`
+* `CACHE_TTL`, optional, default: `48h`
 * `MAX_IMAGE_SIZE_MIB`, optional, default: `20`

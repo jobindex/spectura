@@ -36,7 +36,7 @@ var cache Cache
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	cacheTTLString, _ := getenv("CACHE_TTL", "12h")
+	cacheTTLString, _ := getenv("CACHE_TTL", "48h")
 	cacheTTL, err := time.ParseDuration(cacheTTLString)
 	if err != nil {
 		log.Fatalf(`CACHE_TTL must be a valid duration such as "12h": %s\n`, err)
