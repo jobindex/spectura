@@ -33,6 +33,16 @@ var gridTmpl = template.Must(template.New("grid.tmpl.html").Funcs(funcMap).Parse
 func infoHandler(w http.ResponseWriter, req *http.Request) {
 	query := req.URL.Query()
 	var tmpl *template.Template
+	limit := int64(50)
+	limitRaw := query.Get("limit")
+	if limitRaw != "" {
+		var err error
+		limit, err = strconv.ParseInt(limitRaw, 10, 64)
+		if err != nil {
+			http.Error(w, `Query param "limit" must be a number`, http.StatusBadRequest)
+			return
+		}
+	}
 	if query.Get("grid") == "" {
 		tmpl = infoTmpl
 	} else {
@@ -44,7 +54,11 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 		size += len(entry.Image)
 	}
 
-	err := tmpl.Execute(w, RenderableInfo{entries, fmtByteSize(size), len(entries)})
+	var entryLimit = limit
+	if limit > int64(len(entries)) {
+		entryLimit = int64(len(entries))
+	}
+	err := tmpl.Execute(w, RenderableInfo{entries[:entryLimit], fmtByteSize(size), len(entries)})
 	if err != nil {
 		errId := rand.Intn(int(math.Pow10(8)))
 
