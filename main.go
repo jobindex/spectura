@@ -198,7 +198,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 	if entry.IsEmpty() {
 		entry.Expire = time.Unix(expire, 0)
 		entry.Signature = signature
-		entry.URL = targetURL.String()
+		entry.URL = targetURL
 		err = entry.fetchAndCropImage(false, false)
 		switch {
 		case err == nil:
