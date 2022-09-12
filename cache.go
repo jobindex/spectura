@@ -27,6 +27,29 @@ func (e *CacheEntry) IsFailedImage() bool {
 	return e.URL != nil && e.Image == nil
 }
 
+// merge updates the fields in CacheEntry e based on the fields in o.
+//
+// Image is always updated, and LastUpdated is set to the time of the merge.
+//
+// First and Signature are updated if they were previously empty.
+//
+// LastFetched is updated if it contains a newer timestamp.
+//
+// URL is never updated.
+func (e *CacheEntry) merge(o CacheEntry) {
+	e.Image = o.Image
+	e.LastUpdated = time.Now()
+	if e.Signature == "" {
+		e.Signature = o.Signature
+	}
+	if e.First.IsZero() {
+		e.First = o.First
+	}
+	if o.LastFetched.After(e.LastFetched) {
+		e.LastFetched = o.LastFetched
+	}
+}
+
 // A Cache is an in-memory key-value store of recently accessed CacheEntry
 // values. A new (zero value) Cache must be initialized before use (see Init).
 // Caches are safe for concurrent use by multiple goroutines.
@@ -75,6 +98,10 @@ func (c *Cache) Read(url string) CacheEntry {
 }
 
 // Write writes a CacheEntry to the cache, using entry.URL as the key.
+//
+// If the entry already exists, the cached image is overwritten. The client is
+// responsible for avoiding wasteful updates (i.e. overwriting an image with an
+// identical one).
 func (c *Cache) Write(entry CacheEntry) {
 	c.writeQuery <- entry
 }
@@ -104,14 +131,14 @@ func (c *Cache) serve() {
 			}
 
 		case entry := <-c.writeQuery:
-			now := time.Now()
 			if oldEntry, exists := c.entries[entry.URL.String()]; exists {
-				entry.LastFetched = oldEntry.LastFetched
+				oldEntry.merge(entry)
 			} else {
+				now := time.Now()
 				entry.First = now
 				entry.LastFetched = now
+				entry.LastUpdated = now
 			}
-			entry.LastUpdated = now
 			c.entries[entry.URL.String()] = entry
 
 		// TODO: Auto-refresh cached images if time.Since(entry.LastUpdated)
