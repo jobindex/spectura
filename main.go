@@ -175,8 +175,9 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 
 	if query.Get("bg") != "" {
 		if entry.IsEmpty() {
-			entry.URL = targetURL
+			entry.Expire = time.Unix(expire, 0)
 			entry.Signature = signature
+			entry.URL = targetURL
 		} else {
 			elapsed := time.Since(entry.LastUpdated)
 			if elapsed < bgRateLimitTime {

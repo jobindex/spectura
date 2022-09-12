@@ -36,7 +36,7 @@ func (e *CacheEntry) IsFailedImage() bool {
 //
 // LastFetched is updated if it contains a newer timestamp.
 //
-// URL is never updated.
+// Expire and URL are never updated.
 func (e *CacheEntry) merge(o CacheEntry) {
 	e.Image = o.Image
 	e.LastUpdated = time.Now()
