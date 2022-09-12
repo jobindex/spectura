@@ -15,7 +15,7 @@ services:
     build:
       context: .
     ports:
-      - 8080:19165
+      - 19165:19165
 
   decap:
     image: jobindex/decap:0.13
