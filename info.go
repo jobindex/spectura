@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -70,6 +71,7 @@ func (e *CacheEntry) SpecturaURL() string {
 	specturaURL, _ := url.Parse(screenshotPath)
 	query := specturaURL.Query()
 	query.Set("url", e.URL.String())
+	query.Set("expire", strconv.FormatInt(e.Expire.Unix(), 10))
 	if useSignatures {
 		query.Set("s", e.Signature)
 	}
