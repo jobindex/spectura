@@ -18,7 +18,7 @@ type CacheEntry struct {
 	EntryCreated time.Time
 	ImageCreated time.Time
 	LastFetched  time.Time
-	Provenance   string
+	Provenance   Provenance
 }
 
 // IsEmpty reports whether e is a zero value CacheEntry.
@@ -48,7 +48,7 @@ func merge(old, new CacheEntry) CacheEntry {
 		old.Image = new.Image
 		old.ImageCreated = time.Now()
 	}
-	if old.Provenance == "" {
+	if old.Provenance.when.IsZero() {
 		old.Provenance = new.Provenance
 	}
 	if old.Signature == "" {

@@ -200,7 +200,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 		entry = CacheEntry{
 			Expire:      time.Unix(expire, 0),
 			LastFetched: time.Now(),
-			Provenance:  formatProvenance(req, 150),
+			Provenance:  newProvenance(req),
 			Signature:   signature,
 			URL:         targetURL,
 		}
@@ -217,8 +217,8 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 		}
 		cache.RefreshEntry(entry)
 	} else if !strings.Contains(req.Referer(), infoPath) {
-		if entry.Provenance == "" {
-			entry.Provenance = formatProvenance(req, 150)
+		if entry.Provenance.when.IsZero() {
+			entry.Provenance = newProvenance(req)
 		}
 		entry.LastFetched = time.Now()
 		cache.WriteMetadata(entry)
@@ -227,26 +227,36 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 	w.Write(entry.Image)
 }
 
-// formatProvenance creates a string for the CacheEntry's Provenance field based
-// on the current time, the request's IP address and the Referer/UserAgent
-// header.
-//
-// The width parameter specifies the maximum number of characters in the
-// resulting string.
-func formatProvenance(req *http.Request, width int) string {
-	if width < 3 {
-		return ""
-	}
-	provenance := fmt.Sprintf(
-		"%s | %s | %s | %s",
-		time.Now().Format(time.UnixDate),
-		req.RemoteAddr,
-		req.Referer(),
-		req.UserAgent(),
-	)
-	if len(provenance) > width {
-		return fmt.Sprintf("%*s...", width-3, provenance)
-	}
-	return provenance
+type Provenance struct {
+	addr      string
+	referer   string
+	userAgent string
+	when      time.Time
+}
 
+func newProvenance(req *http.Request) Provenance {
+	return Provenance{
+		addr:      req.RemoteAddr,
+		referer:   req.Referer(),
+		userAgent: req.UserAgent(),
+		when:      time.Now(),
+	}
+}
+
+func (p Provenance) String() string {
+	if p.when.IsZero() {
+		return p.when.Format(time.UnixDate)
+	}
+	s := fmt.Sprintf(
+		"%s | %s | %s | %s",
+		p.when.Format(time.UnixDate),
+		p.addr,
+		p.referer,
+		p.userAgent,
+	)
+	const max = 150
+	if len(s) > max {
+		return fmt.Sprintf("%*s...", max-3, s)
+	}
+	return s
 }
