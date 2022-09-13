@@ -37,18 +37,18 @@
                 </div>
                 <div class="row">
                   <div class="col-3">
-                    <b>First:</b>
+                    <b>EntryCreated:</b>
                   </div>
                   <div class="col">
-                    {{.First | formatDate}}
+                    {{.EntryCreated | formatDate}}
                   </div>
                 </div>
                 <div class="row">
                   <div class="col-3">
-                    <b>LastUpdated:</b>
+                    <b>ImageCreated:</b>
                   </div>
                   <div class="col">
-                    {{.LastUpdated | formatDate }}
+                    {{.ImageCreated | formatDate }}
                   </div>
                 </div>
                 <div class="row">
@@ -65,6 +65,14 @@
                   </div>
                   <div class="col">
                     {{.Expire | formatDate}}
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-3">
+                    <b>Provenance:</b>
+                  </div>
+                  <div class="col">
+                    {{.Provenance}}
                   </div>
                 </div>
               </div>

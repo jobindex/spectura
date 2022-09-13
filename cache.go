@@ -11,13 +11,14 @@ import (
 // A CacheEntry wraps a PNG-encoded image to stored in a Cache. The screenshot
 // URL is used as the cache key.
 type CacheEntry struct {
-	Expire      time.Time
-	Image       []byte
-	Signature   string
-	URL         *url.URL
-	First       time.Time
-	LastUpdated time.Time
-	LastFetched time.Time
+	Expire       time.Time
+	Image        []byte
+	Signature    string
+	URL          *url.URL
+	EntryCreated time.Time
+	ImageCreated time.Time
+	LastFetched  time.Time
+	Provenance   string
 }
 
 // IsEmpty reports whether e is a zero value CacheEntry.
@@ -29,24 +30,32 @@ func (e *CacheEntry) IsFailedImage() bool {
 	return e.URL != nil && e.Image == nil
 }
 
-// merge creates a new CacheEntry based on two existing entries, old and new.
+// merge takes an "old" and a "new" CacheEntry, and creates a copy of the old
+// entry where some fields may have been overwritten by values from the newer
+// entry. It uses the following rules when merging:
 //
-// old's Expire and URL are always kept.
+// Expire and URL are always kept as is.
 //
-// new's Image is always used, and new's First or Signature are used if old's
-// were empty.
+// If Image is non-nil, it is taken from new, and ImageCreated is set to the
+// time of the merge. Otherwise old's Image is kept.
 //
-// Either old's or new's LastFetched is used, whichever is newer.
+// If EntryCreated, Provenance or Signature were empty, they are taken from new,
+// otherwise the old values are used.
 //
-// LastUpdated is set to the time of the merge.
+// The newest value of LastFetched is used.
 func merge(old, new CacheEntry) CacheEntry {
-	old.Image = new.Image
-	old.LastUpdated = time.Now()
+	if new.Image != nil {
+		old.Image = new.Image
+		old.ImageCreated = time.Now()
+	}
+	if old.Provenance == "" {
+		old.Provenance = new.Provenance
+	}
 	if old.Signature == "" {
 		old.Signature = new.Signature
 	}
-	if old.First.IsZero() {
-		old.First = new.First
+	if old.EntryCreated.IsZero() {
+		old.EntryCreated = new.EntryCreated
 	}
 	if new.LastFetched.After(old.LastFetched) {
 		old.LastFetched = new.LastFetched
@@ -110,6 +119,13 @@ func (c *Cache) Write(entry CacheEntry) {
 	c.writeQuery <- entry
 }
 
+// WriteMetadata writes a CacheEntry's metadata to the cache, using entry.URL as
+// the key.
+func (c *Cache) WriteMetadata(entry CacheEntry) {
+	entry.Image = nil
+	c.writeQuery <- entry
+}
+
 func (c *Cache) serve() {
 	purge := time.NewTicker(5 * time.Minute)
 	for {
@@ -130,7 +146,6 @@ func (c *Cache) serve() {
 			}
 			c.readReply <- replyEntry
 			if exists {
-				entry.LastFetched = time.Now()
 				c.entries[url] = entry
 			}
 
@@ -139,19 +154,20 @@ func (c *Cache) serve() {
 				entry = merge(oldEntry, entry)
 			} else {
 				now := time.Now()
-				entry.First = now
-				entry.LastFetched = now
-				entry.LastUpdated = now
+				entry.EntryCreated = now
+				if entry.Image != nil {
+					entry.ImageCreated = now
+				}
 			}
 			c.entries[entry.URL.String()] = entry
 
-		// TODO: Auto-refresh cached images if time.Since(entry.LastUpdated)
+		// TODO: Auto-refresh cached images if time.Since(entry.ImageCreated)
 		// 	     is larger than e.g. 6 hours.
 
 		case <-purge.C:
 			size := 0
 			for url, entry := range c.entries {
-				elapsed := time.Since(entry.LastUpdated)
+				elapsed := time.Since(entry.ImageCreated)
 				if elapsed > c.ttl {
 					delete(c.entries, url)
 					fmt.Fprintf(os.Stderr, "Clearing cache entry %s\n", url)

@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -179,7 +180,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 			entry.Signature = signature
 			entry.URL = targetURL
 		} else {
-			elapsed := time.Since(entry.LastUpdated)
+			elapsed := time.Since(entry.ImageCreated)
 			if elapsed < bgRateLimitTime {
 				msg := fmt.Sprintf("%s since last background request", elapsed)
 				http.Error(w, msg, http.StatusTooManyRequests)
@@ -187,32 +188,65 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 
-		// Update timestamp in cache, so repeated queries are rejected
-		// while the initial query is still being processed.
-		entry.LastUpdated = time.Now()
-		cache.Write(entry)
+		// Create cache entry / update timestamp, so repeated background queries
+		// can be rejected while this query is queued.
+		cache.WriteMetadata(entry)
 
 		cache.RefreshEntry(entry)
 		return
 	}
 
 	if entry.IsEmpty() {
-		entry.Expire = time.Unix(expire, 0)
-		entry.Signature = signature
-		entry.URL = targetURL
+		entry = CacheEntry{
+			Expire:      time.Unix(expire, 0),
+			LastFetched: time.Now(),
+			Provenance:  formatProvenance(req, 150),
+			Signature:   signature,
+			URL:         targetURL,
+		}
 		err = entry.fetchAndCropImage(false, false)
 		switch {
 		case err == nil:
 			cache.Write(entry)
 		case errors.Is(err, croppingError) || errors.Is(err, decapInternalError):
-			cache.Write(entry)
+			cache.WriteMetadata(entry)
 			entry = cache.Read(entry.URL.String())
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		cache.RefreshEntry(entry)
+	} else if !strings.Contains(req.Referer(), infoPath) {
+		if entry.Provenance == "" {
+			entry.Provenance = formatProvenance(req, 150)
+		}
+		entry.LastFetched = time.Now()
+		cache.WriteMetadata(entry)
 	}
 	w.Header().Set("Content-Type", "image/png")
 	w.Write(entry.Image)
+}
+
+// formatProvenance creates a string for the CacheEntry's Provenance field based
+// on the current time, the request's IP address and the Referer/UserAgent
+// header.
+//
+// The width parameter specifies the maximum number of characters in the
+// resulting string.
+func formatProvenance(req *http.Request, width int) string {
+	if width < 3 {
+		return ""
+	}
+	provenance := fmt.Sprintf(
+		"%s | %s | %s | %s",
+		time.Now().Format(time.UnixDate),
+		req.RemoteAddr,
+		req.Referer(),
+		req.UserAgent(),
+	)
+	if len(provenance) > width {
+		return fmt.Sprintf("%*s...", width-3, provenance)
+	}
+	return provenance
+
 }
