@@ -51,7 +51,7 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	entries := cache.ReadAll()
 	sort.SliceStable(entries, func(i, j int) bool {
-		return entries[i].First.After(entries[j].First)
+		return entries[i].EntryCreated.After(entries[j].EntryCreated)
 	})
 	size := 0
 	for _, entry := range entries {

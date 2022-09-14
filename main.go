@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -179,7 +180,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 			entry.Signature = signature
 			entry.URL = targetURL
 		} else {
-			elapsed := time.Since(entry.LastUpdated)
+			elapsed := time.Since(entry.ImageCreated)
 			if elapsed < bgRateLimitTime {
 				msg := fmt.Sprintf("%s since last background request", elapsed)
 				http.Error(w, msg, http.StatusTooManyRequests)
@@ -187,32 +188,75 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 
-		// Update timestamp in cache, so repeated queries are rejected
-		// while the initial query is still being processed.
-		entry.LastUpdated = time.Now()
-		cache.Write(entry)
+		// Create cache entry / update timestamp, so repeated background queries
+		// can be rejected while this query is queued.
+		cache.WriteMetadata(entry)
 
 		cache.RefreshEntry(entry)
 		return
 	}
 
 	if entry.IsEmpty() {
-		entry.Expire = time.Unix(expire, 0)
-		entry.Signature = signature
-		entry.URL = targetURL
+		entry = CacheEntry{
+			Expire:      time.Unix(expire, 0),
+			LastFetched: time.Now(),
+			Provenance:  newProvenance(req),
+			Signature:   signature,
+			URL:         targetURL,
+		}
 		err = entry.fetchAndCropImage(false, false)
 		switch {
 		case err == nil:
 			cache.Write(entry)
 		case errors.Is(err, croppingError) || errors.Is(err, decapInternalError):
-			cache.Write(entry)
+			cache.WriteMetadata(entry)
 			entry = cache.Read(entry.URL.String())
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		cache.RefreshEntry(entry)
+	} else if !strings.Contains(req.Referer(), infoPath) {
+		if entry.Provenance.when.IsZero() {
+			entry.Provenance = newProvenance(req)
+		}
+		entry.LastFetched = time.Now()
+		cache.WriteMetadata(entry)
 	}
 	w.Header().Set("Content-Type", "image/png")
 	w.Write(entry.Image)
+}
+
+type Provenance struct {
+	addr      string
+	referer   string
+	userAgent string
+	when      time.Time
+}
+
+func newProvenance(req *http.Request) Provenance {
+	return Provenance{
+		addr:      req.RemoteAddr,
+		referer:   req.Referer(),
+		userAgent: req.UserAgent(),
+		when:      time.Now(),
+	}
+}
+
+func (p Provenance) String() string {
+	if p.when.IsZero() {
+		return p.when.Format(time.UnixDate)
+	}
+	s := fmt.Sprintf(
+		"%s | %s | %s | %s",
+		p.when.Format(time.UnixDate),
+		p.addr,
+		p.referer,
+		p.userAgent,
+	)
+	const max = 150
+	if len(s) > max {
+		return fmt.Sprintf("%*s...", max-3, s)
+	}
+	return s
 }
