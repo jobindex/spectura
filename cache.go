@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"math/bits"
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/jobindex/spectura/xlib"
 )
 
 // A CacheEntry wraps a PNG-encoded image to stored in a Cache. The screenshot
@@ -175,8 +176,12 @@ func (c *Cache) serve() {
 					size += len(entry.Image)
 				}
 			}
-			fmt.Fprintf(os.Stderr, "%s %d images in cache (%s)\n",
-				time.Now().Format("[15:04:05]"), len(c.entries), fmtByteSize(size))
+			fmt.Fprintf(os.Stderr,
+				"%s %d images in cache (%s)\n",
+				time.Now().Format("[15:04:05]"),
+				len(c.entries),
+				xlib.FmtByteSize(size, 3),
+			)
 		}
 	}
 }
@@ -201,22 +206,11 @@ func (c *Cache) runRefreshTask(e CacheEntry) {
 	c.refreshQueue <- schedule
 	<-schedule
 	if err := e.fetchAndCropImage(true, false); err != nil {
-		fmt.Fprintf(os.Stderr, "Giving up on image refresh: %s", err)
+		fmt.Fprintf(os.Stderr, "Giving up on image refresh: %s\n", err)
 		return
 	}
 	cache.Write(e)
 
 	// TODO: Only write the new image to cache if it is more information dense
 	//       than the previous image.
-}
-
-func fmtByteSize(n int) string {
-	switch exp := bits.Len(uint(n)) / 10; exp {
-	case 0:
-		return fmt.Sprintf("%d B", n)
-	case 1, 2, 3, 4:
-		return fmt.Sprintf("%d %sB", n>>(exp*10), "KMGT"[exp-1:exp])
-	default:
-		return fmt.Sprintf("%d TB", n>>40)
-	}
 }

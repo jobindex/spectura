@@ -67,3 +67,12 @@ curl 'http://localhost:8080/api/spectura/v0/screenshot?&url=https://pyjam.as&exp
 * `SIGNING_UNIQUE_NAME`, optional, default: `jix_spectura`
 * `CACHE_TTL`, optional, default: `48h`
 * `MAX_IMAGE_SIZE_MIB`, optional, default: `20`
+
+== License
+
+Unless otherwise noted, code in this repository is covered by a BSD 3-Clause
+License (see the LICENSE file for details).
+
+Files in the xlib package may contain code written by different authors and
+covered by other Open Source licenses. Consult the copyright headers in the
+specific files for details.

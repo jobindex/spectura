@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/jobindex/spectura/xlib"
 )
 
 type RenderableInfo struct {
@@ -62,7 +64,12 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	if limit > len(entries) {
 		entryLimit = len(entries)
 	}
-	err := tmpl.Execute(w, RenderableInfo{entries[:entryLimit], fmtByteSize(size), len(entries)})
+	info := RenderableInfo{
+		entries[:entryLimit],
+		xlib.FmtByteSize(size, 2),
+		len(entries),
+	}
+	err := tmpl.Execute(w, info)
 	if err != nil {
 		errId := rand.Intn(int(math.Pow10(8)))
 
@@ -77,8 +84,8 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (e *CacheEntry) FmtSize() string {
-	return fmtByteSize(len(e.Image))
+func (e *CacheEntry) FormatByteSize() string {
+	return xlib.FmtByteSize(len(e.Image), 2)
 }
 
 func (e *CacheEntry) SpecturaURL() string {

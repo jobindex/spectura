@@ -8,6 +8,7 @@ RUN go mod download
 
 # copy sause
 COPY *.go image_conf.json ./
+COPY xlib/ ./xlib/
 COPY decap/ ./decap/
 COPY templates/ ./templates/
 

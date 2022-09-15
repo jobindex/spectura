@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/jobindex/spectura/decap"
+	"github.com/jobindex/spectura/xlib"
 )
 
 const (
@@ -63,7 +64,7 @@ func (entry *CacheEntry) fetchAndCropImage(background, nocrop bool) error {
 	entry.Image = buf.Bytes()
 	if len(entry.Image) > maxImageSize {
 		fmt.Fprintf(os.Stderr, "Warning: Size of generated image (%s) exceeds %s\n",
-			fmtByteSize(len(entry.Image)), fmtByteSize(maxImageSize))
+			xlib.FmtByteSize(len(entry.Image), 3), xlib.FmtByteSize(maxImageSize, 3))
 	}
 	return nil
 }
