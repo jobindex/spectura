@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"io"
 	"io/ioutil"
@@ -46,11 +47,23 @@ type SubImager interface {
 }
 
 func (entry *CacheEntry) fetchAndCropImage(background, nocrop bool) error {
-	var m image.Image
-	err := imageFromDecap(&m, entry.URL, !background)
+	var im image.Image
+	err := imageFromDecap(&im, entry.URL, !background)
 	if err != nil {
 		return err
 	}
+
+	var ok bool
+	var m *image.NRGBA
+	if im, ok = im.(*image.NRGBA); ok {
+		m = im.(*image.NRGBA)
+	} else {
+		fmt.Fprintf(os.Stderr, "Unexpected image type %T\n", im)
+		b := im.Bounds()
+		m = image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+		draw.Draw(m, m.Bounds(), im, b.Min, draw.Src)
+	}
+
 	if !nocrop {
 		m = cropImage(m, entry.URL)
 		if m.Bounds().Dy() < OGImageHeight {
@@ -69,9 +82,8 @@ func (entry *CacheEntry) fetchAndCropImage(background, nocrop bool) error {
 	return nil
 }
 
-func cropImage(m image.Image, targetURL *url.URL) image.Image {
+func cropImage(m *image.NRGBA, targetURL *url.URL) *image.NRGBA {
 	voffset := getConfFromHostname(targetURL.Hostname()).Voffset
-	sm := m.(SubImager)
 
 	// If the image contains more than 30 background-looking rows, we remove
 	// some of them by cropping a bit lower.
@@ -120,38 +132,33 @@ func cropImage(m image.Image, targetURL *url.URL) image.Image {
 
 	cropRect = image.Rect(0, voffset, OGImageWidth, voffset+OGImageHeight)
 	cropRect.Add(m.Bounds().Min)
-	return sm.SubImage(cropRect)
+	return m.SubImage(cropRect).(*image.NRGBA)
 }
 
-func countSingleColoredRows(m image.Image, offset int) (int, color.Color) {
+func countSingleColoredRows(m *image.NRGBA, offset int) (int, color.NRGBA) {
 	count := 0
-	bounds := m.Bounds()
-	minY := bounds.Min.Y + offset
-	bgColor := m.At(bounds.Min.X, minY)
+	b := m.Bounds()
+	minY := b.Min.Y + offset
+	bgColor := m.NRGBAAt(b.Min.X, minY)
 
-	r0, g0, b0, a0 := bgColor.RGBA()
-	for y := minY; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			r1, g1, b1, a1 := m.At(x, y).RGBA()
-			if r0 == r1 && g0 == g1 && b0 == b1 && a0 == a1 {
-				continue
+	for y := minY; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			if m.NRGBAAt(x, y) != bgColor {
+				return count, bgColor
 			}
-			return count, bgColor
 		}
 		count++
 	}
 	return count, bgColor
 }
 
-func leftRightMargins(m image.Image, r image.Rectangle, bgColor color.Color) (int, int) {
-	bounds := m.Bounds().Intersect(r)
-	minLeft, maxRight := bounds.Max.X-1, bounds.Min.X
+func leftRightMargins(m *image.NRGBA, r image.Rectangle, bgColor color.NRGBA) (int, int) {
+	b := m.Bounds().Intersect(r)
+	minLeft, maxRight := b.Max.X-1, b.Min.X
 
-	r0, g0, b0, a0 := bgColor.RGBA()
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			r1, g1, b1, a1 := m.At(x, y).RGBA()
-			if r0 == r1 && g0 == g1 && b0 == b1 && a0 == a1 {
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			if m.NRGBAAt(x, y) == bgColor {
 				continue
 			}
 			if x < minLeft {
@@ -159,9 +166,8 @@ func leftRightMargins(m image.Image, r image.Rectangle, bgColor color.Color) (in
 			}
 			break
 		}
-		for x := bounds.Max.X - 1; x >= bounds.Min.X; x-- {
-			r1, g1, b1, a1 := m.At(x, y).RGBA()
-			if r0 == r1 && g0 == g1 && b0 == b1 && a0 == a1 {
+		for x := b.Max.X - 1; x >= b.Min.X; x-- {
+			if m.NRGBAAt(x, y) == bgColor {
 				continue
 			}
 			if x > maxRight {
@@ -169,11 +175,11 @@ func leftRightMargins(m image.Image, r image.Rectangle, bgColor color.Color) (in
 			}
 			break
 		}
-		if minLeft == bounds.Min.X && maxRight == bounds.Max.X-1 {
+		if minLeft == b.Min.X && maxRight == b.Max.X-1 {
 			break
 		}
 	}
-	return minLeft, bounds.Max.X - maxRight - 1
+	return minLeft, b.Max.X - maxRight - 1
 }
 
 func imageFromDecap(m *image.Image, targetURL *url.URL, fast bool) error {
