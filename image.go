@@ -85,7 +85,7 @@ func (entry *CacheEntry) fetchAndCropImage(background, nocrop bool) error {
 func cropImage(m *image.NRGBA, targetURL *url.URL) *image.NRGBA {
 	voffset := getConfFromHostname(targetURL.Hostname()).Voffset
 
-	// If the image contains more than 30 background-looking rows, we remove
+	// If the image contains more than 25 background-looking rows, we remove
 	// some of them by cropping a bit lower.
 	const maxTopMargin = 25
 	topMargin, color := countSingleColoredRows(m, voffset)
