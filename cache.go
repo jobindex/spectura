@@ -168,7 +168,7 @@ func (c *Cache) serve() {
 		case <-purge.C:
 			size := 0
 			for url, entry := range c.entries {
-				elapsed := time.Since(entry.ImageCreated)
+				elapsed := time.Since(entry.EntryCreated)
 				if elapsed > c.ttl {
 					delete(c.entries, url)
 					fmt.Fprintf(os.Stderr, "Clearing cache entry %s\n", url)
