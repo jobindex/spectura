@@ -158,9 +158,8 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if query.Get("nocrop") != "" && !useSignatures {
-		fmt.Fprintln(os.Stderr, "nocrop")
-
 		entry := CacheEntry{URL: targetURL}
+		fmt.Fprintf(os.Stderr, "Cache-miss (nocrop): %s\n", entry.URL)
 		err = entry.fetchAndCropImage(false, true)
 		if err != nil {
 			msg := fmt.Sprintf("nocrop fail: %s", err)
@@ -204,6 +203,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 			Signature:   signature,
 			URL:         targetURL,
 		}
+		fmt.Fprintf(os.Stderr, "Cache miss: %s\n", entry.URL)
 		err = entry.fetchAndCropImage(false, false)
 		switch {
 		case err == nil:
@@ -217,6 +217,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 		}
 		cache.RefreshEntry(entry)
 	} else if !strings.Contains(req.Referer(), infoPath) {
+		fmt.Fprintf(os.Stderr, "Cache hit: %s\n", entry.URL)
 		if entry.Provenance.when.IsZero() {
 			entry.Provenance = newProvenance(req)
 		}
