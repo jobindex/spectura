@@ -180,7 +180,7 @@ func (c *Cache) serve() {
 				}
 
 				if time.Since(entry.ImageCreated) > 3*time.Hour {
-					c.RefreshEntry(entry)
+					go c.runRefreshTask(entry)
 				}
 			}
 			fmt.Fprintf(os.Stderr,
@@ -193,14 +193,6 @@ func (c *Cache) serve() {
 	}
 }
 
-// RefreshEntry queues a background job to capture a fresh screenshot for the
-// cache entry and saves it in the cache. The Decap request uses longer sleep
-// intervals than the one used for synchronous Spectura requests, which
-// typically produces better screenshots.
-func (c *Cache) RefreshEntry(e CacheEntry) {
-	go c.runRefreshTask(e)
-}
-
 func (c *Cache) scheduleRefresh() {
 	for {
 		<-c.refreshQueue <- struct{}{}
@@ -208,6 +200,10 @@ func (c *Cache) scheduleRefresh() {
 	}
 }
 
+// RefreshEntry synchronously queues a background job to capture a fresh
+// screenshot for the cache entry and saves it in the cache. The Decap request
+// uses longer sleep intervals than the one used for synchronous Spectura
+// requests, which typically produces better screenshots.
 func (c *Cache) runRefreshTask(e CacheEntry) {
 	schedule := make(chan struct{})
 	c.refreshQueue <- schedule
@@ -219,7 +215,4 @@ func (c *Cache) runRefreshTask(e CacheEntry) {
 		return
 	}
 	cache.Write(e)
-
-	// TODO: Only write the new image to cache if it is more information dense
-	//       than the previous image.
 }
