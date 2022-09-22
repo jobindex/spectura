@@ -158,8 +158,6 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if query.Get("nocrop") != "" && !useSignatures {
-		fmt.Fprintln(os.Stderr, "nocrop")
-
 		entry := CacheEntry{URL: targetURL}
 		fmt.Fprintf(os.Stderr, "Cache-miss (nocrop): %s\n", entry.URL)
 		err = entry.fetchAndCropImage(false, true)
