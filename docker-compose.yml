@@ -18,6 +18,6 @@ services:
       - 19165:19165
 
   decap:
-    image: jobindex/decap:0.13
+    image: jobindex/decap:0.14
     expose:
       - 4531 # expose to spectura but not to host system
