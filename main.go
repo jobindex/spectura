@@ -191,7 +191,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 		// can be rejected while this query is queued.
 		cache.WriteMetadata(entry)
 
-		go cache.runRefreshTask(entry)
+		go cache.runRefreshTask(entry, true)
 		return
 	}
 
@@ -215,7 +215,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		go cache.runRefreshTask(entry)
+		go cache.runRefreshTask(entry, true)
 	} else if !strings.Contains(req.Referer(), infoPath) {
 		fmt.Fprintf(os.Stderr, "Cache hit: %s\n", entry.URL)
 		if entry.Provenance.when.IsZero() {
