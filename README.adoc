@@ -58,24 +58,29 @@ To test Spectura with `curl`
 
 [source,shell]
 ----
-curl 'http://localhost:19165/api/spectura/v0/screenshot?url=https%3A%2F%2Fpyjam.as&expire=2000000000'
+curl 'http://localhost:19165/api/spectura/v0/screenshot?url=https://pyjam.as&expire=2000000000'
 ----
 
 If you use kitty terminal you can print the image directly in your terminal
 [source,shell]
 ----
-curl 'http://localhost:19165/api/spectura/v0/screenshot?url=https%3A%2F%2Fpyjam.as&expire=2000000000' | kitty +kitten icat
+curl 'http://localhost:19165/api/spectura/v0/screenshot?url=https://pyjam.as&expire=2000000000' | kitty +kitten icat
 ----
 
 == Configuration
 
+* `AUTO_REFRESH_AFTER`, optional, default `6h`
+* `REFRESH_TASK_DELAY`, optional, default `5s`
+* `BG_RATE_LIMIT_TIME`, optional, default: `3h`
+* `CACHE_TTL`, optional, default: `48h`
 * `DECAP_URL`, optional, default: `http://localhost:4531`
-* `USE_SIGNATURES`, optional, default: `true`
-* `SIGNING_SECRET`, required if `USE_SIGNATURES`
 * `IGNORE_BACKGROUND_REQUESTS`, optioanl, default: 'false'
-* `SIGNING_KEY`, required if `USE_SIGNATURES`
-* `SIGNING_UNIQUE_NAME`, optional, default: `jix_spectura` `CACHE_TTL`, optional, default: `48h`
 * `MAX_IMAGE_SIZE_MIB`, optional, default: `20`
+* `SCHEDULE_INTERVAL`, optional, default `5m`
+* `SIGNING_KEY`, required if `USE_SIGNATURES`
+* `SIGNING_SECRET`, required if `USE_SIGNATURES`
+* `SIGNING_UNIQUE_NAME`, optional, default: `jix_spectura`
+* `USE_SIGNATURES`, optional, default: `true`
 
 == License
 

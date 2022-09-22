@@ -23,14 +23,18 @@ const (
 )
 
 var (
+	autoRefreshAfter         time.Duration
+	bgRateLimitTime          time.Duration
+	cacheTTL                 time.Duration
 	decapURL                 string
+	ignoreBackgroundRequests bool
 	maxImageSize             int
+	refreshTaskDelay         time.Duration
+	scheduleInterval         time.Duration
 	signingKey               string
 	signingSecret            string
 	signingUniqueName        string
 	useSignatures            bool
-	ignoreBackgroundRequests bool
-	bgRateLimitTime          time.Duration
 )
 
 var cache Cache
@@ -39,9 +43,28 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	cacheTTLString, _ := getenv("CACHE_TTL", "48h")
-	cacheTTL, err := time.ParseDuration(cacheTTLString)
+	var err error
+	cacheTTL, err = time.ParseDuration(cacheTTLString)
 	if err != nil {
 		log.Fatalf(`CACHE_TTL must be a valid duration such as "12h": %s\n`, err)
+	}
+
+	scheduleIntervalString, _ := getenv("SCHEDULE_INTERVAL", "5m")
+	scheduleInterval, err = time.ParseDuration(scheduleIntervalString)
+	if err != nil {
+		log.Fatalf(`SCHEDULE_INTERVAL must be a valid duration such as "12h": %s\n`, err)
+	}
+
+	autoRefreshAfterString, _ := getenv("AUTO_REFRESH_AFTER", "6h")
+	autoRefreshAfter, err = time.ParseDuration(autoRefreshAfterString)
+	if err != nil {
+		log.Fatalf(`AUTO_REFRESH_AFTER must be a valid duration such as "12h": %s\n`, err)
+	}
+
+	refreshTaskDelayString, _ := getenv("REFRESH_TASK_DELAY", "5s")
+	refreshTaskDelay, err = time.ParseDuration(refreshTaskDelayString)
+	if err != nil {
+		log.Fatalf(`REFRESH_TASK_DELAY must be a valid duration such as "12h": %s\n`, err)
 	}
 
 	bgRateLimitTimeString, _ := getenv("BG_RATE_LIMIT_TIME", "3h")
@@ -82,7 +105,7 @@ func main() {
 		useSignatures = false
 	}
 
-	cache.Init(cacheTTL)
+	cache.Init()
 	if err = loadImageConf(); err != nil {
 		log.Fatalf(`Couldn't load image configuration from "%s": %s`, imageConfPath, err)
 	}
@@ -163,9 +186,8 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if query.Get("nocrop") != "" && !useSignatures {
-		fmt.Fprintln(os.Stderr, "nocrop")
-
 		entry := CacheEntry{URL: targetURL}
+		fmt.Fprintf(os.Stderr, "Cache-miss (nocrop): %s\n", entry.URL)
 		err = entry.fetchAndCropImage(false, true)
 		if err != nil {
 			msg := fmt.Sprintf("nocrop fail: %s", err)
@@ -189,7 +211,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 			entry.Signature = signature
 			entry.URL = targetURL
 		} else {
-			elapsed := time.Since(entry.ImageCreated)
+			elapsed := time.Since(entry.LastRefreshAttempt)
 			if elapsed < bgRateLimitTime {
 				msg := fmt.Sprintf("%s since last background request", elapsed)
 				http.Error(w, msg, http.StatusTooManyRequests)
@@ -213,6 +235,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 			Signature:   signature,
 			URL:         targetURL,
 		}
+		fmt.Fprintf(os.Stderr, "Cache miss: %s\n", entry.URL)
 		err = entry.fetchAndCropImage(false, false)
 		switch {
 		case err == nil:
@@ -226,6 +249,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 		}
 		go cache.runRefreshTask(entry)
 	} else if !strings.Contains(req.Referer(), infoPath) {
+		fmt.Fprintf(os.Stderr, "Cache hit: %s\n", entry.URL)
 		if entry.Provenance.when.IsZero() {
 			entry.Provenance = newProvenance(req)
 		}

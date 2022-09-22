@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net/url"
 	"os"
@@ -12,14 +13,16 @@ import (
 // A CacheEntry wraps a PNG-encoded image to stored in a Cache. The screenshot
 // URL is used as the cache key.
 type CacheEntry struct {
-	Expire       time.Time
-	Image        []byte
-	Signature    string
-	URL          *url.URL
-	EntryCreated time.Time
-	ImageCreated time.Time
-	LastFetched  time.Time
-	Provenance   Provenance
+	Expire             time.Time
+	Image              []byte
+	Signature          string
+	URL                *url.URL
+	EntryCreated       time.Time
+	ImageCreated       time.Time
+	LastRefreshAttempt time.Time
+	LastFetched        time.Time
+	Provenance         Provenance
+	Score              int
 }
 
 // IsEmpty reports whether e is a zero value CacheEntry.
@@ -37,8 +40,10 @@ func (e *CacheEntry) IsFailedImage() bool {
 //
 // Expire and URL are always kept as is.
 //
-// If Image is non-nil, it is taken from new, and ImageCreated is set to the
-// time of the merge. Otherwise old's Image is kept.
+// If the new Image is non-nil, the new image is different to the old image
+// and the score is not signifcantly lower; both Image and Score are overwritten,
+// and ImageCreated is set to the time of the merge.
+// Otherwise old's Image and Score are kept.
 //
 // If EntryCreated, Provenance or Signature were empty, they are taken from new,
 // otherwise the old values are used.
@@ -46,8 +51,14 @@ func (e *CacheEntry) IsFailedImage() bool {
 // The newest value of LastFetched is used.
 func merge(old, new CacheEntry) CacheEntry {
 	if new.Image != nil {
-		old.Image = new.Image
-		old.ImageCreated = time.Now()
+		if new.Score < old.Score/2 || new.Score < old.Score-20 {
+			// Ignore new image because of signifcant information densitiy loss
+		} else if bytes.Compare(new.Image, old.Image) != 0 {
+			// Use new image if it's different
+			old.Image = new.Image
+			old.ImageCreated = time.Now()
+			old.Score = new.Score
+		}
 	}
 	if old.Provenance.when.IsZero() {
 		old.Provenance = new.Provenance
@@ -60,6 +71,9 @@ func merge(old, new CacheEntry) CacheEntry {
 	}
 	if new.LastFetched.After(old.LastFetched) {
 		old.LastFetched = new.LastFetched
+	}
+	if new.LastRefreshAttempt.After(old.LastRefreshAttempt) {
+		old.LastRefreshAttempt = new.LastRefreshAttempt
 	}
 	return old
 }
@@ -77,12 +91,11 @@ type Cache struct {
 	readAllQuery          chan struct{}
 	readAllReply          chan []CacheEntry
 	refreshQueue          chan chan struct{}
-	ttl                   time.Duration
 }
 
 // Init initializes an existing Cache value for use through the Read and Write
 // methods.
-func (c *Cache) Init(ttl time.Duration) {
+func (c *Cache) Init() {
 	*c = Cache{
 		entries:       make(map[string]CacheEntry),
 		fallbackImage: encodeEmptyPNG(OGImageWidth, OGImageHeight),
@@ -92,7 +105,6 @@ func (c *Cache) Init(ttl time.Duration) {
 		readAllQuery:  make(chan struct{}),
 		readAllReply:  make(chan []CacheEntry),
 		refreshQueue:  make(chan chan struct{}, 10),
-		ttl:           ttl,
 	}
 	go c.initFallbackImage()
 	go c.serve()
@@ -128,7 +140,8 @@ func (c *Cache) WriteMetadata(entry CacheEntry) {
 }
 
 func (c *Cache) serve() {
-	purge := time.NewTicker(5 * time.Minute)
+	// Interval for garbage collection and refresh checking
+	scheduleClock := time.NewTicker(scheduleInterval)
 	for {
 		select {
 
@@ -162,18 +175,17 @@ func (c *Cache) serve() {
 			}
 			c.entries[entry.URL.String()] = entry
 
-		// TODO: Auto-refresh cached images if time.Since(entry.ImageCreated)
-		// 	     is larger than e.g. 6 hours.
-
-		case <-purge.C:
+		case <-scheduleClock.C:
 			size := 0
 			for url, entry := range c.entries {
-				elapsed := time.Since(entry.EntryCreated)
-				if elapsed > c.ttl {
+				if time.Since(entry.EntryCreated) > cacheTTL {
 					delete(c.entries, url)
 					fmt.Fprintf(os.Stderr, "Clearing cache entry %s\n", url)
 				} else {
 					size += len(entry.Image)
+				}
+				if time.Since(entry.LastRefreshAttempt) > autoRefreshAfter {
+					go c.runRefreshTask(entry)
 				}
 			}
 			fmt.Fprintf(os.Stderr,
@@ -189,7 +201,7 @@ func (c *Cache) serve() {
 func (c *Cache) scheduleRefresh() {
 	for {
 		<-c.refreshQueue <- struct{}{}
-		time.Sleep(5 * time.Second)
+		time.Sleep(refreshTaskDelay)
 	}
 }
 
@@ -198,9 +210,13 @@ func (c *Cache) scheduleRefresh() {
 // uses longer sleep intervals than the one used for synchronous Spectura
 // requests, which typically produces better screenshots.
 func (c *Cache) runRefreshTask(e CacheEntry) {
+	e.LastRefreshAttempt = time.Now()
+	cache.WriteMetadata(e)
 	schedule := make(chan struct{})
 	c.refreshQueue <- schedule
 	<-schedule
+
+	fmt.Fprintf(os.Stderr, "Cache refresh (score %d): %s\n", e.Score, e.URL)
 	if err := e.fetchAndCropImage(true, false); err != nil {
 		fmt.Fprintf(os.Stderr, "Giving up on image refresh: %s\n", err)
 		return
