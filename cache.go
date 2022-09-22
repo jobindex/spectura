@@ -180,7 +180,7 @@ func (c *Cache) serve() {
 				}
 
 				if time.Since(entry.ImageCreated) > 3*time.Hour {
-					go c.runRefreshTask(entry)
+					go c.runRefreshTask(entry, false)
 				}
 			}
 			fmt.Fprintf(os.Stderr,
@@ -204,10 +204,19 @@ func (c *Cache) scheduleRefresh() {
 // screenshot for the cache entry and saves it in the cache. The Decap request
 // uses longer sleep intervals than the one used for synchronous Spectura
 // requests, which typically produces better screenshots.
-func (c *Cache) runRefreshTask(e CacheEntry) {
+func (c *Cache) runRefreshTask(e CacheEntry, priority bool) {
 	schedule := make(chan struct{})
-	c.refreshQueue <- schedule
-	<-schedule
+	select {
+	case c.refreshQueue <- schedule:
+		<-schedule
+	default:
+		if !priority {
+			fmt.Fprintf(os.Stderr, "Cache refresh dismissed (score %d): %s\n", e.Score, e.URL)
+			return
+		}
+		c.refreshQueue <- schedule
+		<-schedule
+	}
 
 	fmt.Fprintf(os.Stderr, "Cache refresh (score %d): %s\n", e.Score, e.URL)
 	if err := e.fetchAndCropImage(true, false); err != nil {
