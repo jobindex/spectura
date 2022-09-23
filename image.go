@@ -12,7 +12,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -76,8 +75,6 @@ func (entry *CacheEntry) fetchAndCropImage(background, nocrop bool) error {
 		return fmt.Errorf("failed to encode the generated PNG: %w", err)
 	}
 	entry.Image = buf.Bytes()
-	entry.Score = calculateScore(m)
-
 	if len(entry.Image) > maxImageSize {
 		fmt.Fprintf(os.Stderr, "Warning: Size of generated image (%s) exceeds %s\n",
 			xlib.FmtByteSize(len(entry.Image), 3), xlib.FmtByteSize(maxImageSize, 3))
@@ -185,31 +182,6 @@ func leftRightMargins(m *image.NRGBA, r image.Rectangle, bgColor color.NRGBA) (i
 	return minLeft, b.Max.X - maxRight - 1
 }
 
-// calculateScore uses a simple heuristic to calculate information density for a
-// given image: If large parts of the image contains the same color, it scores
-// lower (approaching score 0). If no single color dominates the image, it
-// scores higher (approaching score 100).
-func calculateScore(m *image.NRGBA) int {
-	b := m.Bounds()
-	if b.Dx() == 0 || b.Dy() == 0 {
-		return 0
-	}
-	colors := make(map[color.NRGBA]int)
-	for y := b.Min.Y; y < b.Max.Y; y++ {
-		for x := b.Min.X; x < b.Max.X; x++ {
-			colors[m.NRGBAAt(x, y)]++
-		}
-	}
-	largestArea := 0
-	for _, area := range colors {
-		if area > largestArea {
-			largestArea = area
-		}
-	}
-	maxArea := float64(b.Dx() * b.Dy())
-	return int(math.Ceil((maxArea - float64(largestArea)) * 100 / maxArea))
-}
-
 func imageFromDecap(m *image.Image, targetURL *url.URL, fast bool) error {
 	var d0, d1, timeout time.Duration
 	if fast {
@@ -223,6 +195,7 @@ func imageFromDecap(m *image.Image, targetURL *url.URL, fast bool) error {
 		timeout = slowTimeout
 	}
 
+	fmt.Println(targetURL.String())
 	logImgParam("d0", ", ", int(d0.Milliseconds()))
 	logImgParam("d1", "\n", int(d1.Milliseconds()))
 
