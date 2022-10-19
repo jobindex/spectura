@@ -7,6 +7,13 @@ LinkedIn.
 Spectura takes a `url` and an optional signature `s` as query parameters. The
 signature ensures that we only visit pre-approved URLs.
 
+In local testing, `USE_SIGNATURES` is set to false, so you dont need the `s` parameter.
+
+Spectura also takes `expire`. This is so that we don't spend time generating screenshots of expired jobs.
+Expire is a unix timestamp in seconds. We return the fallback image if expire is exceeded.
+
+If there is no present `expire` property, we always return the fallback image. This is for backwards compatability reasons.
+
 == Setup
 
 You either need to run a Decap instance manually, or run everything inside
@@ -47,15 +54,17 @@ docker compose up --build
 
 To test Spectura with `curl`
 
+> Remeber you need to set `&expire=2000000000` or some other time after today. If you don't have expire or expire is earlier than today, you will get the fallback image.
+
 [source,shell]
 ----
-curl 'http://localhost:8080/api/spectura/v0/screenshot?url=https://pyjam.as&expire=1661810399&'
+curl 'http://localhost:8080/api/spectura/v0/screenshot?url=https://pyjam.as&expire=2000000000'
 ----
 
 If you use kitty terminal you can print the image directly in your terminal
 [source,shell]
 ----
-curl 'http://localhost:8080/api/spectura/v0/screenshot?&url=https://pyjam.as&expire=1661810399&' | kitty +kitten icat
+curl 'http://localhost:8080/api/spectura/v0/screenshot?&url=https://pyjam.as&expire=2000000000' | kitty +kitten icat
 ----
 
 == Configuration
@@ -64,8 +73,7 @@ curl 'http://localhost:8080/api/spectura/v0/screenshot?&url=https://pyjam.as&exp
 * `USE_SIGNATURES`, optional, default: `true`
 * `SIGNING_SECRET`, required if `USE_SIGNATURES`
 * `SIGNING_KEY`, required if `USE_SIGNATURES`
-* `SIGNING_UNIQUE_NAME`, optional, default: `jix_spectura`
-* `CACHE_TTL`, optional, default: `48h`
+* `SIGNING_UNIQUE_NAME`, optional, default: `jix_spectura` `CACHE_TTL`, optional, default: `48h`
 * `MAX_IMAGE_SIZE_MIB`, optional, default: `20`
 
 == License
