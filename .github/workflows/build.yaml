@@ -2,9 +2,10 @@ name: Build and push to dockerhub
 
 on:
   push:
-    tags:
-      - '*.*'
+    branches:
       - 'dev'
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -23,9 +24,18 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          # don't push `dev` to :latest
-          flavor: "latest=${{ github.ref != 'refs/tags/dev' }}"
           images: jobindex/${{ github.event.repository.name }}
+          tags: |
+            # don't push `dev` to :latest
+            type=raw,value=latest,enable={{is_default_branch}}
+            # output dev
+            type=ref,event=branch
+            # output 0.1.2
+            type=semver,pattern={{version}}
+            # output 0.1
+            type=semver,pattern={{major}}.{{minor}}
+            # disabled if major zero
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
 
       - name: Build and push
         uses: docker/build-push-action@v3
