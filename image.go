@@ -23,13 +23,14 @@ import (
 )
 
 const (
-	OGImageHeight     = 314
-	OGImageWidth      = 600
+	OGImageHeight     = 630
+	OGImageWidth      = 1200
 	fallbackImageURL  = "https://www.jobindex.dk/img/jobindex20/spectura_adshare.png"
 	fastFollowupDelay = 1250 * time.Millisecond
 	fastInitDelay     = 2500 * time.Millisecond
 	fastTimeout       = 10 * time.Second
 	imageConfPath     = "image_conf.json"
+	scalingFactor     = 2
 	slowFollowupDelay = 5 * time.Second
 	slowInitDelay     = 10 * time.Second
 	slowTimeout       = 25 * time.Second
@@ -82,11 +83,11 @@ func (entry *CacheEntry) fetchAndCropImage(background, nocrop bool) error {
 }
 
 func cropImage(m *image.NRGBA, targetURL *url.URL) *image.NRGBA {
-	voffset := getConfFromHostname(targetURL.Hostname()).Voffset
+	voffset := getConfFromHostname(targetURL.Hostname()).Voffset * scalingFactor
 
 	// If the image contains more than 25 background-looking rows, we remove
 	// some of them by cropping a bit lower.
-	const maxTopMargin = 25
+	const maxTopMargin = 25 * scalingFactor
 	topMargin, color := countSingleColoredRows(m, voffset)
 	origTopMargin, origVoffset := topMargin, voffset
 	if topMargin > maxTopMargin {
@@ -198,11 +199,13 @@ func imageFromDecap(m *image.Image, targetURL *url.URL, fast bool) error {
 	logImgParam("d0", ", ", int(d0.Milliseconds()))
 	logImgParam("d1", "\n", int(d1.Milliseconds()))
 
+	scale := float64(scalingFactor)
 	req := decap.Request{
 		EmulateViewport: &decap.ViewportBlock{
-			Width:  OGImageWidth,
+			Width:  OGImageWidth / scalingFactor,
 			Height: 1200,
 			Mobile: true,
+			Scale:  &scale,
 		},
 		RenderDelay: d0.String(),
 		Timeout:     timeout.String(),
@@ -277,7 +280,7 @@ func (c *Cache) initFallbackImage() {
 			}
 			res.Body.Close()
 			sm := m.(SubImager)
-			m = sm.SubImage(image.Rect(0, 0, OGImageWidth, OGImageHeight))
+			m = sm.SubImage(image.Rect(0, 0, 600, 314))
 			var buf bytes.Buffer
 			if err = png.Encode(&buf, m); err != nil {
 				errMsg = err.Error()

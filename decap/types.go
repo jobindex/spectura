@@ -16,10 +16,11 @@ type QueryBlock struct {
 }
 
 type ViewportBlock struct {
-	Width       int     `json:"width"`
-	Height      int     `json:"height"`
-	Orientation *string `json:"orientation"`
-	Mobile      bool    `json:"mobile"`
+	Width       int      `json:"width"`
+	Height      int      `json:"height"`
+	Orientation *string  `json:"orientation"`
+	Mobile      bool     `json:"mobile"`
+	Scale       *float64 `json:"scale"`
 }
 
 type Request struct {
