@@ -15,15 +15,22 @@ type QueryBlock struct {
 	While   *Action  `json:"while"`
 }
 
+type ViewportBlock struct {
+	Width       int     `json:"width"`
+	Height      int     `json:"height"`
+	Orientation *string `json:"orientation"`
+	Mobile      bool    `json:"mobile"`
+}
+
 type Request struct {
-	Query            []*QueryBlock `json:"query"`
-	EmulateViewport  []string      `json:"emulate_viewport"`
-	ForwardUserAgent bool          `json:"forward_user_agent"`
-	RenderDelay      string        `json:"global_render_delay"`
-	ReuseTab         bool          `json:"reuse_tab"`
-	ReuseWindow      bool          `json:"reuse_window"`
-	SessionID        string        `json:"sessionid"`
-	Timeout          string        `json:"timeout"`
+	Query            []*QueryBlock  `json:"query"`
+	EmulateViewport  *ViewportBlock `json:"emulate_viewport"`
+	ForwardUserAgent bool           `json:"forward_user_agent"`
+	RenderDelay      string         `json:"global_render_delay"`
+	ReuseTab         bool           `json:"reuse_tab"`
+	ReuseWindow      bool           `json:"reuse_window"`
+	SessionID        string         `json:"sessionid"`
+	Timeout          string         `json:"timeout"`
 }
 
 type Action []string

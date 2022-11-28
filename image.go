@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -200,9 +199,13 @@ func imageFromDecap(m *image.Image, targetURL *url.URL, fast bool) error {
 	logImgParam("d1", "\n", int(d1.Milliseconds()))
 
 	req := decap.Request{
-		EmulateViewport: []string{strconv.Itoa(OGImageWidth), "1200", "mobile"},
-		RenderDelay:     d0.String(),
-		Timeout:         timeout.String(),
+		EmulateViewport: &decap.ViewportBlock{
+			Width:  OGImageWidth,
+			Height: 1200,
+			Mobile: true,
+		},
+		RenderDelay: d0.String(),
+		Timeout:     timeout.String(),
 		Query: []*decap.QueryBlock{
 			{
 				Actions: []decap.Action{
