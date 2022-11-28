@@ -280,7 +280,7 @@ func (c *Cache) initFallbackImage() {
 			}
 			res.Body.Close()
 			sm := m.(SubImager)
-			m = sm.SubImage(image.Rect(0, 0, 600, 314))
+			m = sm.SubImage(image.Rect(0, 0, OGImageWidth, OGImageHeight))
 			var buf bytes.Buffer
 			if err = png.Encode(&buf, m); err != nil {
 				errMsg = err.Error()
