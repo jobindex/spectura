@@ -26,8 +26,6 @@ jobs:
         with:
           images: jobindex/${{ github.event.repository.name }}
           tags: |
-            # don't push `dev` to :latest
-            type=raw,value=latest,enable={{is_default_branch}}
             # output dev
             type=ref,event=branch
             # output 0.1.2
