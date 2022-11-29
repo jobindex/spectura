@@ -1,3 +1,5 @@
+{{ $imgWidth := .OGImageWidth }}
+{{ $imgHeight := .OGImageHeight }}
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -21,7 +23,7 @@
       <div class="row">
         {{range .CacheEntries}}
         <div class="col-3 mb-3">
-          <img class="img-thumbnail" src="{{.SpecturaURL}}" />
+          <img class="img-thumbnail" src="{{.SpecturaURL}}" width="{{$imgWidth}}" height="{{$imgHeight}}" />
         </div>
         {{end}}
       </div>
