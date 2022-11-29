@@ -16,9 +16,11 @@ import (
 )
 
 type RenderableInfo struct {
-	CacheEntries []CacheEntry
-	TotalSize    string
-	TotalEntries int
+	CacheEntries  []CacheEntry
+	TotalSize     string
+	TotalEntries  int
+	OGImageHeight int
+	OGImageWidth  int
 }
 
 func formatDate(date time.Time) string {
@@ -68,6 +70,8 @@ func infoHandler(w http.ResponseWriter, req *http.Request) {
 		entries[:entryLimit],
 		xlib.FmtByteSize(size, 2),
 		len(entries),
+		OGImageHeight,
+		OGImageWidth,
 	}
 	err := tmpl.Execute(w, info)
 	if err != nil {
