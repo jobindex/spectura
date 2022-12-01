@@ -37,7 +37,7 @@ Then make a GET request on the same host:
 
 [source,shell]
 ----
-curl "http://localhost:19165/api/spectura/v0/screenshot/?url=https://www.jobindex.dk/?pictura=1" --output screenshot.png
+curl 'http://localhost:19165/api/spectura/v0/screenshot?url=https%3A%2F%2Fwww.jobindex.dk%2F%3Fspectura%3D1&expire=2000000000' --output screenshot.png
 ----
 
 === Inside Docker [[run_docker]]
@@ -58,13 +58,13 @@ To test Spectura with `curl`
 
 [source,shell]
 ----
-curl 'http://localhost:19165/api/spectura/v0/screenshot?url=https://pyjam.as&expire=2000000000'
+curl 'http://localhost:19165/api/spectura/v0/screenshot?url=https%3A%2F%2Fpyjam.as&expire=2000000000'
 ----
 
 If you use kitty terminal you can print the image directly in your terminal
 [source,shell]
 ----
-curl 'http://localhost:19165/api/spectura/v0/screenshot?&url=https://pyjam.as&expire=2000000000' | kitty +kitten icat
+curl 'http://localhost:19165/api/spectura/v0/screenshot?url=https%3A%2F%2Fpyjam.as&expire=2000000000' | kitty +kitten icat
 ----
 
 == Configuration
