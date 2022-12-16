@@ -72,6 +72,7 @@ curl 'http://localhost:19165/api/spectura/v0/screenshot?url=https%3A%2F%2Fpyjam.
 * `DECAP_URL`, optional, default: `http://localhost:4531`
 * `USE_SIGNATURES`, optional, default: `true`
 * `SIGNING_SECRET`, required if `USE_SIGNATURES`
+* `IGNORE_BACKGROUND_REQUESTS`, optioanl, default: 'false'
 * `SIGNING_KEY`, required if `USE_SIGNATURES`
 * `SIGNING_UNIQUE_NAME`, optional, default: `jix_spectura` `CACHE_TTL`, optional, default: `48h`
 * `MAX_IMAGE_SIZE_MIB`, optional, default: `20`

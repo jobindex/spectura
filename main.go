@@ -23,13 +23,14 @@ const (
 )
 
 var (
-	decapURL          string
-	maxImageSize      int
-	signingKey        string
-	signingSecret     string
-	signingUniqueName string
-	useSignatures     bool
-	bgRateLimitTime   time.Duration
+	decapURL                 string
+	maxImageSize             int
+	signingKey               string
+	signingSecret            string
+	signingUniqueName        string
+	useSignatures            bool
+	ignoreBackgroundRequests bool
+	bgRateLimitTime          time.Duration
 )
 
 var cache Cache
@@ -61,6 +62,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	ignoreBackgroundRequestsString, _ := getenv("IGNORE_BACKGROUND_REQUESTS", "false")
+	ignoreBackgroundRequests = ignoreBackgroundRequestsString == "true"
+
 	useSignaturesString, _ := getenv("USE_SIGNATURES", "true")
 	if useSignaturesString == "true" {
 		useSignatures = true
@@ -175,6 +180,10 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 	entry := cache.Read(targetURL.String())
 
 	if query.Get("bg") != "" {
+		if ignoreBackgroundRequests {
+			w.Write([]byte("Ignored"))
+			return
+		}
 		if entry.IsEmpty() {
 			entry.Expire = time.Unix(expire, 0)
 			entry.Signature = signature
