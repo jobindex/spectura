@@ -1,4 +1,4 @@
-from golang:1.19 as golang
+from golang:1.20 as golang
 
 workdir /app
 
