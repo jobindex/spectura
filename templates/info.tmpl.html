@@ -39,6 +39,14 @@
                 </div>
                 <div class="row">
                   <div class="col-4">
+                    <b>Score:</b>
+                  </div>
+                  <div class="col">
+                    {{.Score}}
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-4">
                     <b>EntryCreated:</b>
                   </div>
                   <div class="col">
@@ -51,6 +59,14 @@
                   </div>
                   <div class="col">
                     {{.ImageCreated | formatDate }}
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-4">
+                    <b>LastRefreshAttempt:</b>
+                  </div>
+                  <div class="col">
+                    {{.LastRefreshAttempt | formatDate }}
                   </div>
                 </div>
                 <div class="row">

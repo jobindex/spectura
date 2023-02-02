@@ -8,6 +8,9 @@ services:
       "SIGNING_KEY": "key"
       "SIGNING_UNIQUE_NAME": "jix_spectura"
       "BG_RATE_LIMIT_TIME": "10s"
+      "REFRESH_TASK_DELAY": "10s"
+      "AUTO_REFRESH_AFTER": "30s"
+      "SCHEDULE_INTERVAL": "30s"
     volumes:
       - "./templates:/templates"
     depends_on:
