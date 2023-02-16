@@ -93,65 +93,65 @@ Event types contain the same data and are:
 
 == Configuration
 
-[cols="3,3,3"]    
-|===    
-| Name | Required | Default    
-| `AUTO_REFRESH_AFTER`                 
-| no                             
-| `6h`                         
-                     
-|`REFRESH_TASK_DELAY`    
-| no    
-| `5s`    
-    
-|`BG_RATE_LIMIT_TIME`    
-| noy
-| `3h`               
-                                                      
-|`CACHE_TTL`                                  
-| no                                                       
-| `48h`                                                  
-                                                       
-| `DECAP_URL`                                        
-| no                                         
-| `http://localhost:4531`                    
-                                                                  
-| `IGNORE_BACKGROUND_REQUESTS`                       
-| no                                   
-| `false`                                          
-    
-| `MAX_IMAGE_SIZE_MIB`    
-| no    
-| `20`    
-    
-| `SCHEDULE_INTERVAL`    
-| no    
-| `5m`    
-    
-| `SIGNING_KEY`                   
-| if `USE_SIGNATURES`                
-| no default                         
-                                     
-| `SIGNING_SECRET`                   
-| if `USE_SIGNATURES`                
-| no default                         
-                                     
-| `SIGNING_UNIQUE_NAME`              
-| no                           
-| `jix_spectura`            
-                                     
-| `USE_SIGNATURES`                   
-| no                           
-| `true`                    
-    
-| `WEBHOOK_URL`    
-| no    
-| no default  
-    
-| `WEBHOOK_AUTHORIZATION_HEADER`    
-| no    
-| no default 
-    
+[cols="3,3,3"]
+|===
+| Name | Required | Default
+| `AUTO_REFRESH_AFTER`
+| no
+| `6h`
+
+|`REFRESH_TASK_DELAY`
+| no
+| `5s`
+
+|`BG_RATE_LIMIT_TIME`
+| no
+| `3h`
+
+|`CACHE_TTL`
+| no
+| `48h`
+
+| `DECAP_URL`
+| no
+| `http://localhost:4531`
+
+| `IGNORE_BACKGROUND_REQUESTS`
+| no
+| `false`
+
+| `MAX_IMAGE_SIZE_MIB`
+| no
+| `20`
+
+| `SCHEDULE_INTERVAL`
+| no
+| `5m`
+
+| `SIGNING_KEY`
+| if `USE_SIGNATURES`
+| no default
+
+| `SIGNING_SECRET`
+| if `USE_SIGNATURES`
+| no default
+
+| `SIGNING_UNIQUE_NAME`
+| no
+| `jix_spectura`
+
+| `USE_SIGNATURES`
+| no
+| `true`
+
+| `WEBHOOK_URL`
+| no
+| no default
+
+| `WEBHOOK_AUTHORIZATION_HEADER`
+| no
+| no default
+
 |===
 
 == License
