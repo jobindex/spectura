@@ -36,45 +36,6 @@ func (e *CacheEntry) IsFailedImage() bool {
 	return e.URL != nil && e.Image == nil
 }
 
-type WebhookBody struct {
-	EventType    string
-	URL          string
-	ImageCreated int64
-	Expire       int64
-}
-
-// Sends updates to webook url if it's set
-func webhook(event_type string, entry CacheEntry) {
-	if webhookURL == "" {
-		return
-	}
-
-	message := WebhookBody{event_type, entry.URL.String(), entry.ImageCreated.Unix(), entry.Expire.Unix()}
-	body, err := json.Marshal(message)
-	if err != nil {
-		internalMsg := fmt.Sprintf("Failed to generate webhook JSON: %s", err)
-		fmt.Fprintln(os.Stderr, internalMsg)
-		return
-	}
-
-	client := &http.Client{}
-
-	req, err := http.NewRequest("POST", webhookURL, bytes.NewBuffer(body))
-	if err != nil {
-		internalMsg := fmt.Sprintf("Failed to generate webhook request: %s", err)
-		fmt.Fprintln(os.Stderr, internalMsg)
-		return
-	}
-	req.Header.Add("Authorization", webhookAuthorizationHeader)
-	req.Header.Add("Content-Type", "application/json")
-	_, err = client.Do(req)
-	if err != nil {
-		internalMsg := fmt.Sprintf("Failed to deliver webhook: %s", err)
-		fmt.Fprintln(os.Stderr, internalMsg)
-		return
-	}
-}
-
 // merge takes an "old" and a "new" CacheEntry, and creates a copy of the old
 // entry where some fields may have been overwritten by values from the newer
 // entry. It uses the following rules when merging:
@@ -265,4 +226,50 @@ func (c *Cache) runRefreshTask(e CacheEntry) {
 		return
 	}
 	cache.Write(e)
+}
+
+type WebhookBody struct {
+	EventType    string
+	URL          string
+	ImageCreated int64
+	Expire       int64
+}
+
+// Sends updates to webook url if it's set
+func webhook(event_type string, entry CacheEntry) {
+	if webhookURL == "" {
+		return
+	}
+
+	message := WebhookBody{event_type, entry.URL.String(), entry.ImageCreated.Unix(), entry.Expire.Unix()}
+	body, err := json.Marshal(message)
+	if err != nil {
+		internalMsg := fmt.Sprintf("Failed to generate webhook JSON: %s", err)
+		fmt.Fprintln(os.Stderr, internalMsg)
+		return
+	}
+
+	client := &http.Client{}
+
+	req, err := http.NewRequest("POST", webhookURL, bytes.NewBuffer(body))
+	if err != nil {
+		internalMsg := fmt.Sprintf("Failed to generate webhook request: %s", err)
+		fmt.Fprintln(os.Stderr, internalMsg)
+		return
+	}
+	req.Header.Add("Authorization", webhookAuthHeader)
+	req.Header.Add("Content-Type", "application/json")
+	var res *http.Response
+	res, err = client.Do(req)
+
+	if err != nil {
+		internalMsg := fmt.Sprintf("Failed to deliver webhook: %s", err)
+		fmt.Fprintln(os.Stderr, internalMsg)
+		return
+	}
+	if res.StatusCode != 200 {
+		internalMsg := fmt.Sprintf("Warning: Webhook responded with status code %d", res.StatusCode)
+		fmt.Fprintln(os.Stderr, internalMsg)
+		return
+	}
 }

@@ -23,20 +23,20 @@ const (
 )
 
 var (
-	autoRefreshAfter           time.Duration
-	bgRateLimitTime            time.Duration
-	cacheTTL                   time.Duration
-	decapURL                   string
-	ignoreBackgroundRequests   bool
-	maxImageSize               int
-	refreshTaskDelay           time.Duration
-	scheduleInterval           time.Duration
-	signingKey                 string
-	signingSecret              string
-	signingUniqueName          string
-	useSignatures              bool
-	webhookURL                 string
-	webhookAuthorizationHeader string
+	autoRefreshAfter         time.Duration
+	bgRateLimitTime          time.Duration
+	cacheTTL                 time.Duration
+	decapURL                 string
+	ignoreBackgroundRequests bool
+	maxImageSize             int
+	refreshTaskDelay         time.Duration
+	scheduleInterval         time.Duration
+	signingKey               string
+	signingSecret            string
+	signingUniqueName        string
+	useSignatures            bool
+	webhookURL               string
+	webhookAuthHeader        string
 )
 
 var cache Cache
@@ -108,7 +108,7 @@ func main() {
 	}
 
 	webhookURL, _ = getenv("WEBHOOK_URL")
-	webhookAuthorizationHeader, _ = getenv("WEBHOOK_AUTHORIZATION_HEADER")
+	webhookAuthHeader, _ = getenv("WEBHOOK_AUTHORIZATION_HEADER")
 
 	cache.Init()
 	if err = loadImageConf(); err != nil {
