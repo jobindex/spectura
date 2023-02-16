@@ -35,6 +35,8 @@ var (
 	signingSecret            string
 	signingUniqueName        string
 	useSignatures            bool
+	webhookURL               string
+	webhookAuthHeader        string
 )
 
 var cache Cache
@@ -104,6 +106,9 @@ func main() {
 	} else {
 		useSignatures = false
 	}
+
+	webhookURL, _ = getenv("WEBHOOK_URL")
+	webhookAuthHeader, _ = getenv("WEBHOOK_AUTHORIZATION_HEADER")
 
 	cache.Init()
 	if err = loadImageConf(); err != nil {

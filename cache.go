@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"time"
@@ -58,6 +60,7 @@ func merge(old, new CacheEntry) CacheEntry {
 			old.Image = new.Image
 			old.ImageCreated = time.Now()
 			old.Score = new.Score
+			go webhook("image_updated", old)
 		}
 	}
 	if old.Provenance.when.IsZero() {
@@ -172,6 +175,7 @@ func (c *Cache) serve() {
 				if entry.Image != nil {
 					entry.ImageCreated = now
 				}
+				go webhook("image_created", entry)
 			}
 			c.entries[entry.URL.String()] = entry
 
@@ -222,4 +226,50 @@ func (c *Cache) runRefreshTask(e CacheEntry) {
 		return
 	}
 	cache.Write(e)
+}
+
+type WebhookBody struct {
+	EventType    string
+	URL          string
+	ImageCreated int64
+	Expire       int64
+}
+
+// Sends updates to webook url if it's set
+func webhook(event_type string, entry CacheEntry) {
+	if webhookURL == "" {
+		return
+	}
+
+	message := WebhookBody{event_type, entry.URL.String(), entry.ImageCreated.Unix(), entry.Expire.Unix()}
+	body, err := json.Marshal(message)
+	if err != nil {
+		internalMsg := fmt.Sprintf("Failed to generate webhook JSON: %s", err)
+		fmt.Fprintln(os.Stderr, internalMsg)
+		return
+	}
+
+	client := &http.Client{}
+
+	req, err := http.NewRequest("POST", webhookURL, bytes.NewBuffer(body))
+	if err != nil {
+		internalMsg := fmt.Sprintf("Failed to generate webhook request: %s", err)
+		fmt.Fprintln(os.Stderr, internalMsg)
+		return
+	}
+	req.Header.Add("Authorization", webhookAuthHeader)
+	req.Header.Add("Content-Type", "application/json")
+	var res *http.Response
+	res, err = client.Do(req)
+
+	if err != nil {
+		internalMsg := fmt.Sprintf("Failed to deliver webhook: %s", err)
+		fmt.Fprintln(os.Stderr, internalMsg)
+		return
+	}
+	if res.StatusCode != 200 {
+		internalMsg := fmt.Sprintf("Warning: Webhook responded with status code %d", res.StatusCode)
+		fmt.Fprintln(os.Stderr, internalMsg)
+		return
+	}
 }

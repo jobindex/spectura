@@ -67,20 +67,92 @@ If you use kitty terminal you can print the image directly in your terminal
 curl 'http://localhost:19165/api/spectura/v0/screenshot?url=https://pyjam.as&expire=2000000000' | kitty +kitten icat
 ----
 
+
+=== Webhook
+
+To get webhook updates you can set the `WEBHOOK_URL` and the `WEBHOOK_AUTHORIZATION_HEADER`.
+
+The `WEBHOOK_URL` will receive a `POST` request with the `Authorization` header set to the value in `WEBHOOK_AUTHORIZATION_HEADER` and a JSON body looking like this:
+
+----
+{
+  "EventType": "image_created",
+  "URL": "https://pyjam.as",
+  "ImageCreated": 1675773692,
+  "Expire": 2000000000
+}
+----
+
+Timestamps are represented as a UNIX seconds in UTC.
+
+Event types contain the same data and are:
+
+* `image_created`,  sent whenever and entry is created
+* `image_updated`, sent whenever the image itself of a cache entry is updated.
+
+
 == Configuration
 
-* `AUTO_REFRESH_AFTER`, optional, default `6h`
-* `REFRESH_TASK_DELAY`, optional, default `5s`
-* `BG_RATE_LIMIT_TIME`, optional, default: `3h`
-* `CACHE_TTL`, optional, default: `48h`
-* `DECAP_URL`, optional, default: `http://localhost:4531`
-* `IGNORE_BACKGROUND_REQUESTS`, optioanl, default: 'false'
-* `MAX_IMAGE_SIZE_MIB`, optional, default: `20`
-* `SCHEDULE_INTERVAL`, optional, default `5m`
-* `SIGNING_KEY`, required if `USE_SIGNATURES`
-* `SIGNING_SECRET`, required if `USE_SIGNATURES`
-* `SIGNING_UNIQUE_NAME`, optional, default: `jix_spectura`
-* `USE_SIGNATURES`, optional, default: `true`
+[cols="3,3,3"]
+|===
+| Name | Required | Default
+| `AUTO_REFRESH_AFTER`
+| no
+| `6h`
+
+|`REFRESH_TASK_DELAY`
+| no
+| `5s`
+
+|`BG_RATE_LIMIT_TIME`
+| no
+| `3h`
+
+|`CACHE_TTL`
+| no
+| `48h`
+
+| `DECAP_URL`
+| no
+| `http://localhost:4531`
+
+| `IGNORE_BACKGROUND_REQUESTS`
+| no
+| `false`
+
+| `MAX_IMAGE_SIZE_MIB`
+| no
+| `20`
+
+| `SCHEDULE_INTERVAL`
+| no
+| `5m`
+
+| `SIGNING_KEY`
+| if `USE_SIGNATURES`
+| no default
+
+| `SIGNING_SECRET`
+| if `USE_SIGNATURES`
+| no default
+
+| `SIGNING_UNIQUE_NAME`
+| no
+| `jix_spectura`
+
+| `USE_SIGNATURES`
+| no
+| `true`
+
+| `WEBHOOK_URL`
+| no
+| no default
+
+| `WEBHOOK_AUTHORIZATION_HEADER`
+| no
+| no default
+
+|===
 
 == License
 

@@ -11,6 +11,7 @@ services:
       "REFRESH_TASK_DELAY": "10s"
       "AUTO_REFRESH_AFTER": "30s"
       "SCHEDULE_INTERVAL": "30s"
+      "WEBHOOK_URL": "http://webhook-tester:5000/webhook"
     volumes:
       - "./templates:/templates"
     depends_on:
@@ -24,3 +25,11 @@ services:
     image: jobindex/decap:0.15
     expose:
       - 4531 # expose to spectura but not to host system
+
+  webhook-tester:
+    build:
+      context: webhook-tester
+    environment:
+      PYTHONUNBUFFERED: true
+    expose:
+        - "5000"
