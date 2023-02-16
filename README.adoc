@@ -72,7 +72,7 @@ curl 'http://localhost:19165/api/spectura/v0/screenshot?url=https://pyjam.as&exp
 
 To get webhook updates you can set the `WEBHOOK_URL` and the `WEBHOOK_AUTHORIZATION_HEADER`.
 
-The `WEBHOOK_URL` will be called with a JSON body looking like this:
+The `WEBHOOK_URL` will receive a `POST` request with the `Authorization` header set to the value in `WEBHOOK_AUTHORIZATION_HEADER` and a JSON body looking like this:
 
 ----
 {
