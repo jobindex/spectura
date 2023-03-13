@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -268,7 +269,12 @@ func webhook(event_type string, entry CacheEntry) {
 		return
 	}
 	if res.StatusCode != 200 {
-		internalMsg := fmt.Sprintf("Warning: Webhook responded with status code %d", res.StatusCode)
+		var text = ""
+		body, err := ioutil.ReadAll(res.Body)
+		if err == nil {
+			text = string(body)
+		}
+		internalMsg := fmt.Sprintf("Warning: Webhook responded with status code: %d, response: '%s'", res.StatusCode, text)
 		fmt.Fprintln(os.Stderr, internalMsg)
 		return
 	}
