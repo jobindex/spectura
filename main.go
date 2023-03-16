@@ -229,6 +229,7 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 		cache.WriteMetadata(entry)
 
 		go cache.runRefreshTask(entry)
+		fmt.Fprint(w, "Success, refresh is now in progress. This can take up to 30 seconds.\n")
 		return
 	}
 
