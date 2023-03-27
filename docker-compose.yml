@@ -30,6 +30,6 @@ services:
     build:
       context: webhook-tester
     environment:
-      PYTHONUNBUFFERED: true
+      PYTHONUNBUFFERED: 1
     expose:
         - "5000"
