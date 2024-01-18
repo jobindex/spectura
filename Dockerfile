@@ -15,7 +15,7 @@ COPY templates/ ./templates/
 # build
 RUN go build
 
-from gcr.io/distroless/base-debian10
+from gcr.io/distroless/base-debian12
 
 workdir /app
 
