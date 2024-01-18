@@ -27,6 +27,7 @@ var (
 	bgRateLimitTime          time.Duration
 	cacheTTL                 time.Duration
 	decapURL                 string
+	adminToken               string
 	ignoreBackgroundRequests bool
 	maxImageSize             int
 	refreshTaskDelay         time.Duration
@@ -87,6 +88,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	adminToken, _ = getenv("ADMIN_TOKEN", "")
 
 	ignoreBackgroundRequestsString, _ := getenv("IGNORE_BACKGROUND_REQUESTS", "false")
 	ignoreBackgroundRequests = ignoreBackgroundRequestsString == "true"
@@ -216,8 +219,9 @@ func screenshotHandler(w http.ResponseWriter, req *http.Request) {
 			entry.Signature = signature
 			entry.URL = targetURL
 		} else {
+			admin := query.Get("token") != "" && query.Get("token") == adminToken
 			elapsed := time.Since(entry.LastRefreshAttempt)
-			if elapsed < bgRateLimitTime {
+			if !admin && elapsed < bgRateLimitTime {
 				msg := fmt.Sprintf("%s since last background request", elapsed)
 				http.Error(w, msg, http.StatusTooManyRequests)
 				return
