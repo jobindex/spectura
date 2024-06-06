@@ -54,15 +54,16 @@ func (entry *CacheEntry) fetchAndCropImage(background, nocrop bool) error {
 		return err
 	}
 
-	var ok bool
 	var m *image.NRGBA
-	if im, ok = im.(*image.NRGBA); ok {
+	switch im.(type) {
+	case *image.NRGBA:
 		m = im.(*image.NRGBA)
-	} else {
-		fmt.Fprintf(os.Stderr, "Unexpected image type %T\n", im)
+	case *image.RGBA:
 		b := im.Bounds()
 		m = image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
 		draw.Draw(m, m.Bounds(), im, b.Min, draw.Src)
+	default:
+		return fmt.Errorf("Unexpected image type %T", im)
 	}
 
 	if !nocrop {
