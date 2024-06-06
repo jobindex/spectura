@@ -1,4 +1,4 @@
-from golang:1.20 as golang
+from golang:1.22-bullseye as golang
 
 workdir /app
 
