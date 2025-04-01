@@ -9,6 +9,7 @@ services:
       "BG_RATE_LIMIT_TIME": "120s"
       "REFRESH_TASK_DELAY": "10s"
       "AUTO_REFRESH_AFTER": "30s"
+      "AUTO_REFRESH_HOST_BLACKLIST": "pyjam.as"
       "SCHEDULE_INTERVAL": "30s"
       "WEBHOOK_URL": "http://webhook-tester:5000/webhook"
       "ADMIN_TOKEN": "test"
