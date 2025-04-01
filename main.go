@@ -24,6 +24,7 @@ const (
 
 var (
 	autoRefreshAfter         time.Duration
+	autoRefreshHostBlacklist []string
 	bgRateLimitTime          time.Duration
 	cacheTTL                 time.Duration
 	decapURL                 string
@@ -63,6 +64,9 @@ func main() {
 	if err != nil {
 		log.Fatalf(`AUTO_REFRESH_AFTER must be a valid duration such as "12h": %s\n`, err)
 	}
+
+	autoRefreshHostBlacklistString, _ := getenv("AUTO_REFRESH_HOST_BLACKLIST", "")
+	autoRefreshHostBlacklist = strings.Split(autoRefreshHostBlacklistString, ",")
 
 	refreshTaskDelayString, _ := getenv("REFRESH_TASK_DELAY", "5s")
 	refreshTaskDelay, err = time.ParseDuration(refreshTaskDelayString)

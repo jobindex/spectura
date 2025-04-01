@@ -100,6 +100,10 @@ Event types contain the same data and are:
 | no
 | `6h`
 
+| `AUTO_REFRESH_HOST_BLACKLIST`
+| no
+| no default ( example: `pyjam.as,www.jobindex.dk` )
+
 |`REFRESH_TASK_DELAY`
 | no
 | `5s`
