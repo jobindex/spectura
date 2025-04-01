@@ -1,6 +1,6 @@
-from golang:1.22-bullseye as golang
+FROM golang:1.22-bullseye as golang
 
-workdir /app
+WORKDIR /app
 
 # install dependecies
 COPY go.mod go.sum ./
@@ -15,9 +15,9 @@ COPY templates/ ./templates/
 # build
 RUN go build
 
-from gcr.io/distroless/base-debian12
+FROM gcr.io/distroless/base-debian12
 
-workdir /app
+WORKDIR /app
 
 COPY --from=golang /app/spectura /bin/spectura
 COPY --from=golang /app/image_conf.json image_conf.json
