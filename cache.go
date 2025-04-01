@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"time"
+	"slices"
 
 	"github.com/jobindex/spectura/xlib"
 )
@@ -188,6 +189,9 @@ func (c *Cache) serve() {
 					fmt.Fprintf(os.Stderr, "Clearing cache entry %s\n", url)
 				} else {
 					size += len(entry.Image)
+				}
+				if slices.Contains(autoRefreshHostBlacklist, entry.URL.Host) {
+					continue
 				}
 				if time.Since(entry.LastRefreshAttempt) > autoRefreshAfter {
 					go c.runRefreshTask(entry)
